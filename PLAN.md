@@ -285,12 +285,65 @@ tower-http = { version = "0.6", features = ["cors"] }
 | 服务器无 Rust 编译环境 | CI 构建，服务器只下载 artifact |
 | DeepSeek API 兼容性 | pi_agent_rust 已支持 DeepSeek 作为 provider |
 
-## 八、核心参考索引
+## 八、核心参考文档库
 
-| 文件 | 内容 |
+### 8.1 基础环境与核心接口
+
+| 类别 | 文档/项目 | 核心价值 | 地址 |
+|------|----------|---------|------|
+| 异步运行时 | Tokio 官方文档 | Rust 异步编程基石，理解 axum 的前提 | [docs.rs/tokio](https://docs.rs/tokio) |
+| 模型 API | DeepSeek Rust 客户端 | 项目成败关键。参考 `deepseek_rs`、`ds-api` 等库实现稳定对接 | [docs.rs/deepseek_rs](https://docs.rs/deepseek_rs) |
+
+### 8.2 业务逻辑与底层依赖
+
+| 类别 | 文档/项目 | 核心价值 | 地址 |
+|------|----------|---------|------|
+| Pi Rust 官方 | pi_agent_rust | 项目主库，提供 Agent 最上层接口。本地路径: `/root/dev/pi_rust` | [github.com/Dicklesworthstone/pi_agent_rust](https://github.com/Dicklesworthstone/pi_agent_rust) |
+| Pi 设计原理 | 设计解析文章 | 深入理解 Pi 极简且强大的设计哲学 | 知乎/百度开发者中心搜索"Pi Agent 设计逻辑" |
+| Agent 核心逻辑 | pi-agent (crate) | 封装 Agent 对话循环 (`Agent::run`) 和工具系统 | [docs.rs/pi-agent](https://docs.rs/pi-agent) |
+| 统一模型接口 | pi-ai (crate) | 为 DeepSeek 等模型提供统一的调用接口 | [docs.rs/pi-ai](https://docs.rs/pi-ai) |
+| 文件操作增强 | aft-pi (npm) | 高性能文件操作（索引、模糊搜索），Agent 的强力助手 | [npmjs.com/package/@cortexkit/aft-pi](https://www.npmjs.com/package/@cortexkit/aft-pi) |
+| TS 架构参考 | @oh-my-pi/pi-agent-core | TypeScript 版架构对理解 Rust 版有极高参考价值 | [npmjs.com/package/@oh-my-pi/pi-agent-core](https://www.npmjs.com/package/@oh-my-pi/pi-agent-core) |
+| 前端组件库 | @earendil-works/pi-web-ui | Lit web components (ChatPanel, AgentInterface)。本地备份: `/root/dev/pi_web_ui_ref` | npm `@earendil-works/pi-web-ui` |
+
+### 8.3 服务封装与实战参考
+
+| 类别 | 文档/项目 | 核心价值 | 地址 |
+|------|----------|---------|------|
+| Web 框架 | axum 官方文档 | 架构现代、模块化，开发效率高，适合内部 API 快速构建 | [docs.rs/axum](https://docs.rs/axum) |
+| Web 框架备选 | actix-web 官方文档 | 性能极致、久经考验，适合对延迟敏感的高性能公开服务 | [docs.rs/actix-web](https://docs.rs/actix-web) |
+| **核心实战参考** | agent-discord-rs | **最宝贵参考资料**。展示如何通过 RPC 调用 Pi，处理多 Agent 后台服务。核心文件: `agent/pi.rs` (PiAgent), `agent/mod.rs` (AiAgent trait), `session.rs` (SessionManager) | [docs.rs/agent-discord-rs](https://docs.rs/agent-discord-rs) |
+
+### 8.4 agent-discord-rs 关键架构模式
+
+以下模式直接复用到 pi-web 中：
+
+```
+PiAgent 结构:
+  ├── child: tokio::process::Child          # pi --mode rpc 子进程
+  ├── stdin: Arc<Mutex<ChildStdin>>         # 串行写入 JSONL 命令
+  ├── event_tx: broadcast::Sender            # 广播 stdout 解析出的事件
+  └── Drop: SIGKILL 清理子进程
+
+命令发送: raw_call(Value) → 写入 stdin JSON line → 返回 request_id
+事件读取: 后台 tokio task 逐行读取 stdout → parse JSON → broadcast::send
+SessionManager: HashMap<channel_id, Arc<dyn AiAgent>>
+  每个 channel/session 对应一个独立的 PiAgent 实例
+
+AiAgent trait (统一抽象):
+  - prompt(input) → AgentEvent stream
+  - set_model(provider, model_id), set_thinking_level(level)
+  - abort(), compact()
+  - get_available_models() → Vec<ModelInfo>
+```
+
+### 8.5 本地文件索引
+
+| 路径 | 内容 |
 |------|------|
-| `/root/dev/pi_rust/src/` | pi_agent_rust 源码 (RPC 实现) |
-| `/root/dev/pi_web_ui_ref/` | pi-web-ui 组件源码 (前端参考) |
-| agent-discord-rs (crates.io) | PiAgent 进程管理模式 |
-| axum docs | Web 框架用法 |
-| DeepSeek API docs | 模型对接 |
+| `/root/dev/pi_rust/` | pi_agent_rust 源码 (fork) — upstream 是 Dicklesworthstone/pi_agent_rust |
+| `/root/dev/pi_rust/src/` | RPC 实现、agent loop、tool system |
+| `/root/dev/pi_web_ui_ref/` | pi-web-ui 组件源码备份 (已从 TS pi 仓库提取) |
+| `/root/dev/pi-web/src/pi/protocol.rs` | RPC 命令/事件类型定义 |
+| `/root/dev/pi-web/src/pi/agent.rs` | PiAgent 进程管理 (参考 agent-discord-rs) |
+| `/root/dev/pi-web/Cargo.toml` | 项目依赖清单 |
