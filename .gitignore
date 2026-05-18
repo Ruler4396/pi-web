@@ -1,0 +1,4 @@
+target/
+spa/dist/
+spa/node_modules/
+*.tar.gz

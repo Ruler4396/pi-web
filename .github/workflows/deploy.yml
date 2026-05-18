@@ -1,0 +1,62 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build SPA
+        working-directory: spa
+        run: |
+          npm ci
+          npm run build
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+
+      - name: Build pi-web
+        run: cargo build --release
+
+      - name: Package artifacts
+        run: |
+          mkdir -p dist/pi-web
+          cp target/release/pi-web dist/pi-web/
+          cp -r spa/dist dist/pi-web/spa-dist/
+          cd dist && tar czf ../pi-web.tar.gz pi-web/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-web
+          path: pi-web.tar.gz
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pi-web
+
+      - name: Deploy to server
+        run: echo "TODO: scp to 8.138.1.39"

@@ -1,0 +1,20 @@
+[Unit]
+Description=Pi Web Server
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/pi/pi-web
+Restart=always
+RestartSec=5
+
+Environment=PORT=3000
+Environment=PI_BINARY=/opt/pi/pi
+Environment=PI_SESSIONS_DIR=/root/.pi/agent/sessions
+Environment=PI_WEB_AUTH_TOKEN=<INTERNAL_TOKEN>
+
+User=root
+WorkingDirectory=/opt/pi
+
+[Install]
+WantedBy=multi-user.target
