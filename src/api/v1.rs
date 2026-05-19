@@ -42,6 +42,7 @@ fn session_info_from_line(line: &str) -> Option<Value> {
     let sid = v["id"].as_str()?;
     let ts = v["timestamp"].as_str().unwrap_or("");
     let created = iso_to_ms(ts);
+    let dir = v.get("directory").and_then(|d| d.as_str()).unwrap_or("/");
     Some(json!({
         "id": sid,
         "time": { "created": created, "updated": created },
@@ -49,6 +50,7 @@ fn session_info_from_line(line: &str) -> Option<Value> {
         "provider": v["provider"].as_str().unwrap_or("deepseek"),
         "agent": "pi",
         "status": "idle",
+        "directory": dir,
     }))
 }
 
@@ -112,6 +114,71 @@ fn message_to_old_format(id: &str, sid: &str, msg: &Value, ts: &str) -> Value {
     result
 }
 
+
+pub async fn config_get() -> Json<Value> {
+    Json(json!({}))
+}
+
+pub async fn config_update(Json(body): Json<Value>) -> Json<Value> {
+    Json(json!({}))
+}
+
+pub async fn config_providers() -> Json<Value> {
+    Json(json!({"providers": []}))
+}
+
+pub async fn lsp_status() -> Json<Value> {
+    Json(Value::Array(vec![]))
+}
+
+pub async fn mcp_list() -> Json<Value> {
+    Json(Value::Array(vec![]))
+}
+
+pub async fn mcp_add(Json(body): Json<Value>) -> Json<Value> {
+    Json(json!({}))
+}
+
+pub async fn mcp_delete(Path(name): Path<String>) -> StatusCode {
+    StatusCode::NO_CONTENT
+}
+
+pub async fn mcp_connect(Path(name): Path<String>, Json(body): Json<Value>) -> Json<Value> {
+    Json(json!({}))
+}
+
+pub async fn mcp_disconnect(Path(name): Path<String>) -> StatusCode {
+    StatusCode::NO_CONTENT
+}
+
+pub async fn mcp_auth(Path(name): Path<String>, Json(body): Json<Value>) -> Json<Value> {
+    Json(json!({}))
+}
+
+pub async fn mcp_auth_delete(Path(name): Path<String>) -> StatusCode {
+    StatusCode::NO_CONTENT
+}
+
+pub async fn mcp_auth_callback(Path(name): Path<String>, Json(body): Json<Value>) -> Json<Value> {
+    Json(json!({}))
+}
+
+pub async fn mcp_auth_authenticate(Path(name): Path<String>, Json(body): Json<Value>) -> Json<Value> {
+    Json(json!({}))
+}
+
+pub async fn provider_auth(State(state): State<AppState>) -> Json<Value> {
+    Json(json!({"providers": []}))
+}
+
+pub async fn session_status(State(state): State<AppState>) -> Json<Value> {
+    Json(json!({
+        "idle": true,
+        "sessions": 0,
+        "activeSession": null,
+    }))
+}
+
 pub async fn global_health() -> Json<Value> {
     Json(json!({
         "healthy": true,
@@ -171,6 +238,7 @@ pub async fn session_list(
     State(state): State<AppState>,
     Query(params): Query<Value>,
 ) -> Result<Json<Value>, StatusCode> {
+    let dir_filter = params.get("directory").and_then(|d| d.as_str()).unwrap_or("/").to_string();
     let sessions_info = state.sessions.list().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let mut sessions: Vec<Value> = Vec::new();
 
@@ -189,7 +257,14 @@ pub async fn session_list(
                 "time": { "created": 0, "updated": 0 },
                 "agent": "pi",
                 "status": "idle",
+                "directory": dir_filter,
             }));
+        }
+    }
+
+    for s in &mut sessions {
+        if s.get("directory").and_then(|d| d.as_str()).unwrap_or("").is_empty() {
+            s["directory"] = json!(dir_filter);
         }
     }
 
@@ -204,8 +279,10 @@ pub async fn session_list(
 
 pub async fn session_create(
     State(state): State<AppState>,
+    Query(params): Query<Value>,
     Json(body): Json<Value>,
 ) -> Result<Json<Value>, StatusCode> {
+    let dir = params.get("directory").and_then(|d| d.as_str()).unwrap_or("/");
     let id = Uuid::new_v4().to_string();
     let agent = state.sessions.get_or_create(&id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let _ = state.session_events.send(SessionEvent {
@@ -221,6 +298,7 @@ pub async fn session_create(
         "provider": "deepseek",
         "agent": body.get("agent").and_then(|a| a.as_str()).unwrap_or("pi"),
         "status": "idle",
+        "directory": dir,
     })))
 }
 
