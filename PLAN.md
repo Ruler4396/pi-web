@@ -72,3 +72,12 @@ Errors: 0
 48cf398 feat: three-panel layout with file tree sidebar, context menu, drag-drop upload
 0bbbd50 feat: backend file API (list, read, download, write, delete)
 ```
+
+
+### Phase 15: Slash Commands + Keyboard Shortcuts ✅ (2026-05-20)
+- ✅ slash-commands component — 8 commands, keyboard nav, auto-filter
+- ✅ session-stats — message count, model badge, thinking badge (color-coded)
+- ✅ Ctrl+B toggle sidebar, Escape abort, Ctrl+Enter send, Ctrl+L clear, / slash trigger
+- ✅ GET /api/session/:id/export — Markdown export
+- ✅ POST /api/session/:id/archive, restore
+- ✅ Playwright: 8/8 checks pass, 0 errors
