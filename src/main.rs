@@ -38,6 +38,7 @@ async fn main() -> anyhow::Result<()> {
     let sessions = pi::SessionManager::new(config.clone());
     let (session_events, _) = broadcast::channel::<SessionEvent>(64);
     let state = AppState { config, sessions, session_events };
+    let port = state.config.port;
 
     let app = Router::new()
         .route("/api/health", get(|| async { "ok" }))
@@ -53,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
         .fallback(embed::spa_fallback)
         .with_state(state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], state.config.port));
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
     tracing::info!("pi-web listening on http://{addr}");
 
     let listener = TcpListener::bind(addr).await?;
