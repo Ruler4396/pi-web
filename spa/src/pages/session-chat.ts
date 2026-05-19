@@ -265,8 +265,52 @@ export class SessionChat extends LitElement {
             ${this.cwd}
           </span>
         </div>
-        <div style="flex:1;min-height:0;display:flex;flex-direction:column">${this.chatPanel}</div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
+          ${this.chatPanel}
+          ${this.showWelcome && this.agent && this.agent.state.messages.length === 0 ? this.renderWelcome() : ""}
+        </div>
       </div>
     `;
+  }
+
+  renderWelcome() {
+    const currentModel = (this.agent?.state as any)?.model?.label || "DeepSeek Chat";
+    return html`
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.94);z-index:10;pointer-events:none">
+        <div style="text-align:center;max-width:420px;padding:2rem">
+          <div style="font-size:2.5rem;margin-bottom:0.75rem">pi</div>
+          <h2 style="margin:0 0 0.5rem;font-size:1.25rem;font-weight:600;color:#111">Start a conversation</h2>
+          <p style="margin:0 0 1rem;color:#64748b;font-size:0.875rem;line-height:1.5">
+            Model &middot; ${currentModel} &ensp; Dir &middot; ${this.cwd}
+          </p>
+          <div style="background:#f1f5f9;border-radius:8px;padding:0.75rem 1rem;text-align:left">
+            <p style="margin:0 0 0.5rem;font-size:0.75rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em">Try asking</p>
+            <p style="margin:0.25rem 0;font-size:0.8125rem;color:#475569;cursor:pointer;pointer-events:auto"
+               @click=${() => this.fillPrompt("What files are in this directory?")}>
+              "What files are in this directory?"
+            </p>
+            <p style="margin:0.25rem 0;font-size:0.8125rem;color:#475569;cursor:pointer;pointer-events:auto"
+               @click=${() => this.fillPrompt("Create a simple Python web server")}>
+              "Create a simple Python web server"
+            </p>
+            <p style="margin:0.25rem 0;font-size:0.8125rem;color:#475569;cursor:pointer;pointer-events:auto"
+               @click=${() => this.fillPrompt("Explain how the project is structured")}>
+              "Explain how the project is structured"
+            </p>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  fillPrompt(text: string) {
+    const textarea = this.querySelector("textarea");
+    if (textarea) {
+      (textarea as HTMLTextAreaElement).value = text;
+      (textarea as HTMLTextAreaElement).focus();
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    this.showWelcome = false;
+    this.requestUpdate();
   }
 }
