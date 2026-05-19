@@ -21,6 +21,10 @@ export class HttpAgent {
     return this._state;
   }
 
+  get recognized(): boolean {
+    return true;
+  }
+
   subscribe(listener: (event: AgentEvent, signal: AbortSignal) => void | Promise<void>): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);

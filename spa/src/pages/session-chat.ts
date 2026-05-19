@@ -142,10 +142,7 @@ export class SessionChat extends LitElement {
     this.chatPanel.style.minHeight = "0";
 
     await this.chatPanel.setAgent(this.agent as any, {
-      onBeforeSend: async () => {
-        if (this.agent!.state.messages.length === 0) {
-          await this.loadHistory();
-        }
+      onBeforeSend: () => {
         this.showWelcome = false;
       },
       onApiKeyRequired: async () => true,
