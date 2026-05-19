@@ -33,6 +33,7 @@ impl SessionManager {
 
         let session_file = self.session_path(session_id);
         let agent = PiAgent::spawn(&self.config.pi_binary, &self.config.sessions_dir, &session_file)
+            .await
             .with_context(|| format!("failed to create session {session_id}"))?;
 
         let agent = Arc::new(agent);
@@ -41,6 +42,22 @@ impl SessionManager {
         info!(%session_id, "session created");
 
         Ok(agent)
+    }
+
+    pub async fn remove(&self, session_id: &str) {
+        let mut agents = self.agents.write().await;
+        if agents.remove(session_id).is_some() {
+            info!(%session_id, "session removed");
+        }
+        // PiAgent Drop handler kills the child process
+
+        // Remove session file if it exists
+        let session_file = self.session_path(session_id);
+        if session_file.exists() {
+            if let Err(e) = std::fs::remove_file(&session_file) {
+                warn!(%session_id, error = %e, "failed to remove session file");
+            }
+        }
     }
 
     pub async fn list(&self) -> anyhow::Result<Vec<SessionInfo>> {

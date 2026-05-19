@@ -8,15 +8,23 @@ use std::net::SocketAddr;
 
 use axum::{Router, middleware, routing::get};
 use tokio::net::TcpListener;
+use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::config::Config;
 
 #[derive(Clone)]
+pub struct SessionEvent {
+    pub event: String,
+    pub session_id: String,
+}
+
+#[derive(Clone)]
 struct AppState {
     config: Config,
     sessions: pi::SessionManager,
+    session_events: broadcast::Sender<SessionEvent>,
 }
 
 #[tokio::main]
@@ -28,7 +36,8 @@ async fn main() -> anyhow::Result<()> {
 
     let config = Config::from_env()?;
     let sessions = pi::SessionManager::new(config.clone());
-    let state = AppState { config, sessions };
+    let (session_events, _) = broadcast::channel::<SessionEvent>(64);
+    let state = AppState { config, sessions, session_events };
 
     let app = Router::new()
         .route("/api/health", get(|| async { "ok" }))

@@ -1,3 +1,5 @@
+@import "@earendil-works/pi-web-ui/app.css";
+
 *,
 *::before,
 *::after {
@@ -10,15 +12,4 @@ body {
   font-family: system-ui, -apple-system, sans-serif;
   color: #111;
   background: #fff;
-}
-
-@media (prefers-color-scheme: dark) {
-  body {
-    color: #e5e7eb;
-    background: #111827;
-  }
-  .session-card { border-color: #374151; }
-  .session-card:hover { background: #1f2937; }
-  input { background: #1f2937; color: #e5e7eb; border-color: #374151; }
-  .input-area { border-color: #374151; }
 }

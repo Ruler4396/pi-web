@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
 };
 
-use crate::AppState;
+use crate::{SessionEvent, AppState};
 
 pub async fn list(State(state): State<AppState>) -> Result<Json<serde_json::Value>, StatusCode> {
     let sessions = state.sessions.list().await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -13,6 +13,10 @@ pub async fn list(State(state): State<AppState>) -> Result<Json<serde_json::Valu
 pub async fn create(State(state): State<AppState>) -> Result<Json<serde_json::Value>, StatusCode> {
     let id = uuid::Uuid::new_v4().to_string();
     let agent = state.sessions.get_or_create(&id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let _ = state.session_events.send(SessionEvent {
+        event: "session_created".into(),
+        session_id: id.clone(),
+    });
     Ok(Json(serde_json::json!({"id": agent.session_id()})))
 }
 
@@ -28,9 +32,11 @@ pub async fn delete(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, StatusCode> {
-    // TODO: kill agent + delete session file
-    let agents = state.sessions.clone();
-    // placeholder
+    state.sessions.remove(&id).await;
+    let _ = state.session_events.send(SessionEvent {
+        event: "session_deleted".into(),
+        session_id: id,
+    });
     Ok(StatusCode::NO_CONTENT)
 }
 

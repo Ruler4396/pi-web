@@ -9,6 +9,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "^0.75.3",
+    "@earendil-works/pi-ai": "^0.75.3",
     "@earendil-works/pi-web-ui": "^0.75.0",
     "lit": "^3.2.0"
   },

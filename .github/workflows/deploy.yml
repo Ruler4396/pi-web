@@ -2,7 +2,7 @@ name: Build and Deploy
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      actions: read
 
     steps:
       - uses: actions/checkout@v4
@@ -59,4 +58,29 @@ jobs:
           name: pi-web
 
       - name: Deploy to server
-        run: echo "TODO: scp to 8.138.1.39"
+        env:
+          SSH_HOST: 8.138.1.39
+          SSH_USER: root
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p /tmp/pi-deploy
+          tar xzf pi-web.tar.gz -C /tmp/pi-deploy
+
+          scp -o StrictHostKeyChecking=no \
+            -r /tmp/pi-deploy/pi-web/* \
+            ${SSH_USER}@${SSH_HOST}:/opt/pi/
+
+          ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SSH_HOST} << 'EOF'
+            set -e
+            # Install pi binary if not present
+            if [ ! -f /opt/pi/pi ]; then
+              echo "ERROR: /opt/pi/pi not found — build and deploy pi_agent_rust first"
+              exit 1
+            fi
+            chmod +x /opt/pi/pi-web /opt/pi/pi
+            # Restart service
+            systemctl daemon-reload
+            systemctl restart pi-web || true
+          EOF
+
+          rm -rf /tmp/pi-deploy

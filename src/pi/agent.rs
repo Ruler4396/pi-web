@@ -3,7 +3,6 @@ use std::process::Stdio;
 use std::sync::Arc;
 
 use anyhow::Context;
-use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{Mutex, broadcast};
@@ -20,7 +19,7 @@ pub struct PiAgent {
 }
 
 impl PiAgent {
-    pub fn spawn(
+    pub async fn spawn(
         pi_binary: &std::path::Path,
         session_dir: &std::path::Path,
         session_file: &std::path::Path,
@@ -42,7 +41,11 @@ impl PiAgent {
         let _stderr = child.stderr.take().context("failed to open pi stderr")?;
 
         let stdin = Arc::new(Mutex::new(stdin));
-        let session_id = "new".to_string();
+        let session_id = session_file
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown")
+            .to_string();
 
         let agent = Self {
             session_id: session_id.clone(),
@@ -53,16 +56,11 @@ impl PiAgent {
         };
 
         // 后台读取 stdout JSONL
-        tokio::spawn(read_stdout(stdout, event_tx, session_id.clone()));
+        tokio::spawn(read_stdout(stdout, event_tx.clone(), session_id.clone()));
 
-        // request initial state
-        let agent_clone = Self {
-            session_id: session_id.clone(),
-            session_file: session_file.to_path_buf(),
-            event_tx: agent.event_tx.clone(),
-            stdin: stdin.clone(),
-            child: None,
-        };
+        // 请求初始状态
+        let cmd = RpcCommand::get_state();
+        agent.send_command(&cmd).await?;
 
         Ok(agent)
     }
@@ -71,12 +69,13 @@ impl PiAgent {
         self.event_tx.subscribe()
     }
 
-    pub async fn send_command(&self, cmd: &RpcCommand) -> anyhow::Result<()> {
+    pub async fn send_command(&self, cmd: &RpcCommand) -> anyhow::Result<String> {
+        let id = cmd.id.clone().unwrap_or_default();
         let line = serde_json::to_string(cmd)? + "\n";
         let mut stdin = self.stdin.lock().await;
         stdin.write_all(line.as_bytes()).await?;
         stdin.flush().await?;
-        Ok(())
+        Ok(id)
     }
 
     pub fn session_id(&self) -> &str {

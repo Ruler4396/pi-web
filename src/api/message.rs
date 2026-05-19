@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::{
     Json, extract::{Path, State},
     http::StatusCode,
@@ -5,19 +7,39 @@ use axum::{
 };
 use futures::stream::Stream;
 use serde_json::Value;
+use tokio::time::timeout;
 
 use crate::AppState;
+
+use super::super::pi::protocol::{AgentEvent, RpcCommand};
 
 pub async fn list(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, StatusCode> {
     let agent = state.sessions.get_or_create(&id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let cmd = crate::pi::protocol::RpcCommand::get_messages();
-    agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    // TODO: wait for CommandResponse with messages
-    Ok(Json(serde_json::json!({"messages": []})))
+    let cmd = RpcCommand::get_messages();
+    let req_id = agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let mut rx = agent.subscribe();
+    let deadline = timeout(Duration::from_secs(10), async {
+        loop {
+            match rx.recv().await {
+                Ok(AgentEvent::CommandResponse { id, data, .. }) if id == req_id => {
+                    return data.unwrap_or(serde_json::json!({"messages": []}));
+                }
+                Ok(AgentEvent::Error { error, .. }) => {
+                    return serde_json::json!({"error": error});
+                }
+                Ok(_) => continue,
+                Err(_) => return serde_json::json!({"messages": []}),
+            }
+        }
+    });
+
+    let data = deadline.await.unwrap_or(serde_json::json!({"messages": []}));
+    Ok(Json(data))
 }
 
 pub async fn send(
@@ -28,7 +50,7 @@ pub async fn send(
     let agent = state.sessions.get_or_create(&id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let message = body["message"].as_str().unwrap_or_default().to_string();
-    let cmd = crate::pi::protocol::RpcCommand::prompt(&message);
+    let cmd = RpcCommand::prompt(&message);
     agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let mut rx = agent.subscribe();
