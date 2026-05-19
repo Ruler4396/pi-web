@@ -124,6 +124,9 @@ export class HttpAgent {
                 await this.emit({
                   type: "message_update",
                   message: updateMsg,
+                  text: delta || currentAssistantContent,
+                  delta: delta || currentAssistantContent,
+                  content: currentAssistantContent,
                   assistantMessageEvent: deltaEvent,
                 } as any);
                 break;
