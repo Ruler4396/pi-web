@@ -184,6 +184,28 @@ export class SessionList extends LitElement {
       border: 1px solid #fecaca;
     }
 
+    .btn-delete {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.12s;
+      opacity: 0;
+    }
+    .session-card:hover .btn-delete { opacity: 1; }
+    .btn-delete:hover {
+      background: #fef2f2;
+      color: #dc2626;
+    }
+
     .loading-wrap {
       display: flex;
       justify-content: center;
@@ -211,6 +233,14 @@ export class SessionList extends LitElement {
     } finally {
       this.loading = false;
     }
+  }
+
+  async deleteSession(id: string, e: Event) {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/session/${id}`, { method: "DELETE" });
+      this.sessions = this.sessions.filter(s => s.id !== id);
+    } catch {}
   }
 
   async createSession() {
@@ -267,6 +297,9 @@ export class SessionList extends LitElement {
                       <span class="session-status ${s.active ? 'status-active' : 'status-idle'}">
                         ${s.active ? "Active" : "Idle"}
                       </span>
+                      <button class="btn-delete" @click=${(e: Event) => this.deleteSession(s.id, e)} title="Delete session">
+                        ✕
+                      </button>
                     </div>
                   `
                 )}

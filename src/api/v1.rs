@@ -243,15 +243,17 @@ pub async fn session_list(
     let mut sessions: Vec<Value> = Vec::new();
 
     for info in &sessions_info {
+        let mut found = false;
         if let Ok(content) = tokio::fs::read_to_string(&info.file).await {
             for line in content.lines() {
                 if let Some(s) = session_info_from_line(line) {
                     sessions.push(s);
+                    found = true;
                     break;
                 }
             }
         }
-        if sessions.len() < sessions_info.len() {
+        if !found {
             sessions.push(json!({
                 "id": info.id,
                 "time": { "created": 0, "updated": 0 },
