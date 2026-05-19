@@ -19,10 +19,9 @@ pub async fn list(
 ) -> Result<Json<Value>, StatusCode> {
     let agent = state.sessions.get_or_create(&id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    let mut rx = agent.subscribe();
     let cmd = RpcCommand::get_messages();
     let req_id = agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let mut rx = agent.subscribe();
     let deadline = timeout(Duration::from_secs(10), async {
         loop {
             match rx.recv().await {
@@ -50,10 +49,9 @@ pub async fn send(
     let agent = state.sessions.get_or_create(&id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let message = body["message"].as_str().unwrap_or_default().to_string();
+    let mut rx = agent.subscribe();
     let cmd = RpcCommand::prompt(&message);
     agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let mut rx = agent.subscribe();
     let stream = async_stream::stream! {
         loop {
             match rx.recv().await {

@@ -38,7 +38,7 @@ impl PiAgent {
 
         let stdin = child.stdin.take().context("failed to open pi stdin")?;
         let stdout = child.stdout.take().context("failed to open pi stdout")?;
-        let _stderr = child.stderr.take().context("failed to open pi stderr")?;
+        let stderr = child.stderr.take().context("failed to open pi stderr")?;
 
         let stdin = Arc::new(Mutex::new(stdin));
         let session_id = session_file
@@ -55,8 +55,9 @@ impl PiAgent {
             child: Some(child),
         };
 
-        // 后台读取 stdout JSONL
+        // 后台读取 stdout JSONL 和 stderr
         tokio::spawn(read_stdout(stdout, event_tx.clone(), session_id.clone()));
+        tokio::spawn(read_stderr(stderr, session_id.clone()));
 
         // 请求初始状态
         let cmd = RpcCommand::get_state();
@@ -89,6 +90,28 @@ impl Drop for PiAgent {
             tokio::spawn(async move {
                 let _ = child.kill().await;
             });
+        }
+    }
+}
+
+async fn read_stderr(stderr: tokio::process::ChildStderr, session_id: String) {
+    use tokio::io::AsyncBufReadExt;
+    let mut reader = tokio::io::BufReader::new(stderr).lines();
+    loop {
+        match reader.next_line().await {
+            Ok(Some(line)) => {
+                if !line.trim().is_empty() {
+                    warn!(%session_id, "pi stderr: {line}");
+                }
+            }
+            Ok(None) => {
+                info!(%session_id, "pi stderr closed");
+                break;
+            }
+            Err(e) => {
+                error!(%session_id, "pi stderr read error: {e:#}");
+                break;
+            }
         }
     }
 }

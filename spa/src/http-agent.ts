@@ -182,6 +182,15 @@ export class HttpAgent {
     }
   }
 
+  async setModel(provider: string, modelId: string): Promise<void> {
+    this._state.model = { provider, id: modelId, label: modelId } as any;
+    await fetch(`/api/session/${this.sessionId}/model`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider, modelId }),
+    }).catch(() => {});
+  }
+
   abort() {
     this._aborted = true;
     this.abortController?.abort();

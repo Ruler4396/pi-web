@@ -306,10 +306,9 @@ pub async fn message_list(
 ) -> Result<Json<Value>, StatusCode> {
     let agent = state.sessions.get_or_create(&id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
+    let mut rx = agent.subscribe();
     let cmd = RpcCommand::get_messages();
     let req_id = agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let mut rx = agent.subscribe();
     let deadline = tokio::time::timeout(std::time::Duration::from_secs(10), async {
         loop {
             match rx.recv().await {
@@ -353,10 +352,9 @@ pub async fn message_send(
         .unwrap_or("")
         .to_string();
 
+    let mut rx = agent.subscribe();
     let cmd = RpcCommand::prompt(&input_text);
     agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-
-    let mut rx = agent.subscribe();
     let stream = async_stream::stream! {
         let sid = session_id.clone();
         let msg_id = message_id.clone();
