@@ -1,7 +1,36 @@
 import "./app.css";
 import { html, render } from "lit";
+import { setAppStorage } from "@earendil-works/pi-web-ui";
 import "./pages/session-list";
 import "./pages/session-chat";
+
+// Initialize minimal AppStorage mock for web mode.
+// The pi-web-ui ChatPanel calls ti() internally which requires AppStorage.
+// We provide a no-op backend since auth/model selection is handled server-side.
+setAppStorage({
+  settings: {
+    get: async () => undefined,
+    set: async () => {},
+    subscribe: () => () => {},
+  },
+  providerKeys: {
+    get: async () => undefined,
+    set: async () => {},
+    subscribe: () => () => {},
+  },
+  sessions: {
+    getAllMetadata: async () => [],
+    subscribe: () => () => {},
+  },
+  customProviders: {
+    getAll: async () => [],
+    subscribe: () => () => {},
+  },
+  backend: {
+    getQuotaInfo: async () => ({ usage: 0, quota: 0 }),
+    requestPersistence: async () => false,
+  },
+} as any);
 
 class AppRoot {
   currentRoute = "";
@@ -60,7 +89,6 @@ class AppRoot {
       return;
     }
 
-    // Unknown route → back to session list
     window.location.hash = "";
   }
 }

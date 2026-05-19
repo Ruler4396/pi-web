@@ -15,27 +15,40 @@ export class SessionChat extends LitElement {
     .topbar {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 1rem;
-      border-bottom: 1px solid #e5e7eb;
+      gap: 0.75rem;
+      padding: 0.625rem 1.125rem;
       background: #fff;
+      border-bottom: 1px solid #e2e8f0;
       flex-shrink: 0;
+      min-height: 44px;
     }
-    .topbar a {
+    .topbar .back {
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
       text-decoration: none;
-      color: #3b82f6;
+      color: #64748b;
       font-size: 0.8125rem;
       font-weight: 500;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+      transition: all 0.12s;
     }
-    .topbar a:hover { text-decoration: underline; }
-    .topbar .sid {
-      color: #9ca3af;
+    .topbar .back:hover {
+      color: #1d4ed8;
+      background: #eff6ff;
+    }
+    .topbar .divider {
+      color: #cbd5e1;
       font-size: 0.75rem;
-      font-family: ui-monospace, monospace;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      user-select: none;
     }
+    .topbar .sid {
+      color: #94a3b8;
+      font-size: 0.75rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+
     .loading-wrap {
       flex: 1;
       display: flex;
@@ -43,9 +56,15 @@ export class SessionChat extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 1rem;
-      color: #6b7280;
-      font-size: 0.875rem;
+      color: #64748b;
+      font-size: 0.9375rem;
+      background: #f8fafc;
     }
+    .loading-wrap .hint {
+      font-size: 0.8125rem;
+      color: #94a3b8;
+    }
+
     .error-wrap {
       flex: 1;
       display: flex;
@@ -53,19 +72,32 @@ export class SessionChat extends LitElement {
       align-items: center;
       justify-content: center;
       gap: 0.75rem;
-      color: #dc2626;
-      font-size: 0.875rem;
+      background: #f8fafc;
       text-align: center;
       padding: 2rem;
     }
+    .error-wrap .err-icon {
+      font-size: 2rem;
+      margin-bottom: 0.25rem;
+    }
+    .error-wrap .err-msg {
+      color: #b91c1c;
+      font-size: 0.9375rem;
+      font-weight: 500;
+    }
     .error-wrap button {
-      padding: 0.5rem 1rem;
-      background: #3b82f6;
+      margin-top: 0.5rem;
+      padding: 0.5rem 1.25rem;
+      background: #1d4ed8;
       color: #fff;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
-      font-size: 0.8125rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .error-wrap button:hover {
+      background: #1e40af;
     }
   `;
 
@@ -75,7 +107,6 @@ export class SessionChat extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    // Set host layout via JS (bypasses light-DOM :host bug)
     this.style.display = "flex";
     this.style.flexDirection = "column";
     this.style.flex = "1";
@@ -114,7 +145,8 @@ export class SessionChat extends LitElement {
     if (this.error) {
       return html`
         <div class="error-wrap">
-          <div>Failed to load: ${this.error}</div>
+          <div class="err-icon">⚠️</div>
+          <div class="err-msg">${this.error}</div>
           <button @click=${() => { this.error = ""; this.connectedCallback(); }}>
             Retry
           </button>
@@ -126,17 +158,22 @@ export class SessionChat extends LitElement {
       return html`
         <div class="loading-wrap">
           <div class="spinner"></div>
-          <span>Loading chat...</span>
+          <span>Loading chat interface...</span>
+          <span class="hint">Connecting to session ${this.sessionId.slice(0, 8)}</span>
         </div>
       `;
     }
 
     return html`
-      <div style="flex:1;min-height:0;display:flex;flex-direction:column">
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:#fff">
         <div class="topbar">
-          <a href="#" @click=${(e: Event) => { e.preventDefault(); window.location.hash = ""; }}>
+          <a class="back" href="#" @click=${(e: Event) => {
+            e.preventDefault();
+            window.location.hash = "";
+          }}>
             ← Sessions
           </a>
+          <span class="divider">·</span>
           <span class="sid">${this.sessionId.slice(0, 8)}...</span>
         </div>
         <div style="flex:1;min-height:0;display:flex;flex-direction:column">${this.chatPanel}</div>
