@@ -319,7 +319,6 @@ export class SessionChat extends LitElement {
         </div>
       `;
     }
-
     return html`
       <div style="flex:1;min-height:0;display:flex;flex-direction:column;background:#fff">
         <div class="topbar">
@@ -330,15 +329,38 @@ export class SessionChat extends LitElement {
             ← Sessions
           </a>
           <span class="divider">·</span>
+          <button class="toggle-sidebar" @click=${() => { this.sidebarOpen = !this.sidebarOpen; this.requestUpdate(); }}
+                  title="Toggle sidebar (Ctrl+B)">
+            ${this.sidebarOpen ? "◧" : "◨"}
+          </button>
+          <span class="divider">·</span>
           <span class="sid" @click=${() => this.renameSession()} title="Click to rename session">${this.sessionId.slice(0, 8)}</span>
           <span class="divider">·</span>
           <span class="cwd" @click=${() => this.editCwd()} title="Click to change working directory">
             ${this.cwd}
           </span>
         </div>
-        <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
-          ${this.chatPanel}
-          ${this.showWelcome && this.agent && this.agent.state.messages.length === 0 ? this.renderWelcome() : ""}
+        <div style="flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden">
+          ${this.sidebarOpen ? html`
+            <div class="sidebar" style="width:${this.sidebarWidth}px">
+              <div class="sidebar-header">
+                <span>${this.cwd.split("/").pop() || this.cwd}</span>
+                <file-upload @file-changed=${() => this.onFileChanged()}></file-upload>
+              </div>
+              <file-tree rootPath=${this.cwd}
+                         @file-select=${(e: CustomEvent) => this.onFileSelect(e)}
+                         @file-contextmenu=${(e: CustomEvent) => this.onFileContextMenu(e)}
+                         @file-open=${(e: CustomEvent) => this.onFileOpen(e)}
+                         @file-changed=${() => this.onFileChanged()}>
+              </file-tree>
+            </div>
+            <div class="resize-handle ${this.resizing ? 'active' : ''}"
+                 @mousedown=${(e: MouseEvent) => this.startResize(e)}></div>
+          ` : ""}
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative;min-width:0">
+            ${this.chatPanel}
+            ${this.showWelcome && this.agent && this.agent.state.messages.length === 0 ? this.renderWelcome() : ""}
+          </div>
         </div>
       </div>
     `;
