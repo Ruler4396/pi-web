@@ -5,8 +5,9 @@ import { HttpAgent } from "../http-agent";
 import "../components/file-tree";
 import "../components/file-context-menu";
 import "../components/file-upload";
-import "../components/slash-commands";
-import "../components/session-stats";
+import { SlashCommands } from "../components/slash-commands";
+import { SessionStats } from "../components/session-stats";
+window.__components = { SlashCommands, SessionStats };
 
 @customElement("session-chat")
 export class SessionChat extends LitElement {
@@ -351,13 +352,13 @@ export class SessionChat extends LitElement {
 
   private async exportSession() {
     try {
-      const res = await fetch(`/api/session/${this.sessionId}/export`);
+      const res = await fetch("/api/session/" + this.sessionId + "/export");
       if (res.ok) {
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `session-${this.sessionId.slice(0, 8)}.md`;
+        a.download = "session-" + this.sessionId.slice(0, 8) + ".md";
         a.click();
         URL.revokeObjectURL(url);
       }
@@ -370,57 +371,6 @@ export class SessionChat extends LitElement {
     const next = levels[(levels.indexOf(current) + 1) % levels.length];
     this.agent?.setThinking(next);
     this.requestUpdate();
-    this.setupKeyboard();
-  }
-
-  setupKeyboard() {
-    const handler = (e: KeyboardEvent) => {
-      const textarea = this.querySelector("textarea") as HTMLTextAreaElement;
-      const slash = this.querySelector("slash-commands") as any;
-
-      if (e.key === "/" && document.activeElement === textarea && !textarea.value) {
-        const rect = textarea.getBoundingClientRect();
-        if (slash) {
-          slash.position = { x: rect.left, y: rect.bottom - 310 };
-          slash.filter = "";
-          slash.visible = true;
-          slash.requestUpdate();
-        }
-        return;
-      }
-      if (slash && slash.visible) {
-        if (e.key === "Escape") { slash.visible = false; e.preventDefault(); return; }
-        if (e.key === "ArrowDown") { slash.navigateDown(); e.preventDefault(); return; }
-        if (e.key === "ArrowUp") { slash.navigateUp(); e.preventDefault(); return; }
-        if (e.key === "Enter") {
-          const sel = slash.getSelected();
-          if (sel) { this.onSlashSelect(new CustomEvent("x", { detail: sel })); slash.visible = false; }
-          e.preventDefault();
-          return;
-        }
-        if (e.key.length === 1) {
-          const val = textarea ? textarea.value : "";
-          slash.filter = val.slice(val.lastIndexOf("/"));
-          return;
-        }
-      }
-
-      if (e.ctrlKey && e.key === "b") { this.sidebarOpen = !this.sidebarOpen; e.preventDefault(); }
-      if (e.key === "Escape" && !(slash && slash.visible)) { this.agent?.abort(); }
-      if (e.ctrlKey && e.key === "Enter") {
-        const btns = this.querySelectorAll("button");
-        for (let i = 0; i < btns.length; i++) {
-          const r = btns[i].getBoundingClientRect();
-          if (r.width === 32 && r.height === 32 && r.left > 600) { btns[i].click(); break; }
-        }
-        e.preventDefault();
-      }
-      if (e.ctrlKey && e.key === "l") {
-        if (textarea) { textarea.value = ""; textarea.focus(); }
-        e.preventDefault();
-      }
-    };
-    document.addEventListener("keydown", handler);
   }
 
   renameSession() {
@@ -505,6 +455,17 @@ export class SessionChat extends LitElement {
             ${this.showWelcome && this.agent && this.agent.state.messages.length === 0 ? this.renderWelcome() : ""}
           </div>
         </div>
+        <slash-commands
+          @slash-select=${(e: CustomEvent) => this.onSlashSelect(e)}>
+        </slash-commands>
+        <session-stats
+          .messageCount=${this.agent?.state?.messages?.length || 0}
+          .model=${(this.agent?.state as any)?.model?.label || "deepseek-chat"}
+          .thinking=${(this.agent?.state?.thinkingLevel as string) || "off"}
+          .isStreaming=${this.agent?.state?.isStreaming || false}
+          @stats-model-click=${() => this.showModelPicker()}
+          @stats-thinking-click=${() => this.onThinkingClick()}>
+        </session-stats>
       </div>
     `;
   }
@@ -548,56 +509,5 @@ export class SessionChat extends LitElement {
     }
     this.showWelcome = false;
     this.requestUpdate();
-    this.setupKeyboard();
-  }
-
-  setupKeyboard() {
-    const handler = (e: KeyboardEvent) => {
-      const textarea = this.querySelector("textarea") as HTMLTextAreaElement;
-      const slash = this.querySelector("slash-commands") as any;
-
-      if (e.key === "/" && document.activeElement === textarea && !textarea.value) {
-        const rect = textarea.getBoundingClientRect();
-        if (slash) {
-          slash.position = { x: rect.left, y: rect.bottom - 310 };
-          slash.filter = "";
-          slash.visible = true;
-          slash.requestUpdate();
-        }
-        return;
-      }
-      if (slash && slash.visible) {
-        if (e.key === "Escape") { slash.visible = false; e.preventDefault(); return; }
-        if (e.key === "ArrowDown") { slash.navigateDown(); e.preventDefault(); return; }
-        if (e.key === "ArrowUp") { slash.navigateUp(); e.preventDefault(); return; }
-        if (e.key === "Enter") {
-          const sel = slash.getSelected();
-          if (sel) { this.onSlashSelect(new CustomEvent("x", { detail: sel })); slash.visible = false; }
-          e.preventDefault();
-          return;
-        }
-        if (e.key.length === 1) {
-          const val = textarea ? textarea.value : "";
-          slash.filter = val.slice(val.lastIndexOf("/"));
-          return;
-        }
-      }
-
-      if (e.ctrlKey && e.key === "b") { this.sidebarOpen = !this.sidebarOpen; e.preventDefault(); }
-      if (e.key === "Escape" && !(slash && slash.visible)) { this.agent?.abort(); }
-      if (e.ctrlKey && e.key === "Enter") {
-        const btns = this.querySelectorAll("button");
-        for (let i = 0; i < btns.length; i++) {
-          const r = btns[i].getBoundingClientRect();
-          if (r.width === 32 && r.height === 32 && r.left > 600) { btns[i].click(); break; }
-        }
-        e.preventDefault();
-      }
-      if (e.ctrlKey && e.key === "l") {
-        if (textarea) { textarea.value = ""; textarea.focus(); }
-        e.preventDefault();
-      }
-    };
-    document.addEventListener("keydown", handler);
   }
 }
