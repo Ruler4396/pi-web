@@ -101,7 +101,7 @@
 │   └── pi-web.service             # systemd unit
 └── .github/
     └── workflows/
-        └── deploy.yml             # CI: 编译 Rust → 构建 SPA → 打包 (TODO: 完善部署步骤)
+        └── deploy.yml             # CI: 编译 Rust → 构建 SPA → 打包 → 上传 artifact
 ```
 
 ## 四、实施阶段
@@ -140,19 +140,23 @@
 - [x] spa/vite.config.ts: 生产构建 + dev proxy
 - [x] spa/src/app.css: pi-web-ui Tailwind CSS 导入
 
-### Phase 6：CI + 部署 (🔴 TODO)
-- [ ] **CI deploy.yml 完善** — 填上 scp/rsync 到服务器的实际部署步骤
-- [ ] deploy/nginx-snippet.conf ✅ (已完成)
-- [ ] deploy/pi-web.service ✅ (已完成)
+### Phase 6：CI + 部署 (⚠️ 部分完成)
+- [x] **CI deploy.yml** — 编译 Rust + 构建 SPA + 打包上传 artifact，3 次成功运行
+- [x] **deploy/deploy.sh** — 手动部署脚本（cp binary + systemd + nginx）
+- [x] **deploy/nginx-snippet.conf** — Nginx 4443 代理 pi-web 配置
+- [x] **deploy/pi-web.service** — systemd unit
+- [ ] **自动化部署** — CI artifact 自动 scp/rsync 到服务器（需 GitHub SSH secret）
 
-### Phase 7：迁移对齐 (🔴 TODO)
-- [ ] 在服务器上：下载 CI artifact + 解压到 `/opt/pi/`
-- [ ] 复制 `deploy/pi-web.service` → systemd enable + start
-- [ ] 复制 `deploy/nginx-snippet.conf` → Nginx reload
-- [ ] 验证 `/api/health` 正常
-- [ ] 验证 DeepSeek 模型可用 (`pi --model deepseek ...`)
-- [ ] 验证 SPA 正常访问（创建会话 + 发消息）
-- [ ] 回滚方案：切换回 opencode-web.service
+### Phase 7：迁移对齐 (⚠️ 部分完成)
+- [x] **下载 CI artifact + 解压** — 已完成（手动 scp，非 CI 自动下载）
+- [x] **复制 pi-web.service -> systemd** — 已 enable + running on :3000
+- [ ] **复制 nginx-snippet.conf -> Nginx reload** — 未部署，pi-web 尚无域名入口
+- [ ] **部署 SPA dist** — CI 构建了但未安装到服务器（/opt/pi/spa-dist/ 不存在）
+- [x] **验证 /api/health** — 正常（200 OK）
+- [ ] **验证 DeepSeek 模型** — pi --model deepseek ... 未测试
+- [ ] **验证 SPA 访问** — 先部署 nginx + SPA 后方可测试
+- [ ] **验证会话创建 + 发消息** — 需 SPA + nginx + API 全链路通
+- [ ] **回滚方案** — 切换回 opencode-web.service（待补充具体步骤）
 
 ## 五、API 面 (精简自 OpenCode Web 的 80+ 端点)
 

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Context;
 use tokio::sync::RwLock;
@@ -32,6 +33,7 @@ impl SessionManager {
         drop(agents);
 
         let session_file = self.session_path(session_id);
+        self.init_session_file(&session_file, session_id).await?;
         let agent = PiAgent::spawn(&self.config.pi_binary, &self.config.sessions_dir, &session_file)
             .await
             .with_context(|| format!("failed to create session {session_id}"))?;
@@ -42,6 +44,30 @@ impl SessionManager {
         info!(%session_id, "session created");
 
         Ok(agent)
+    }
+
+    async fn init_session_file(&self, path: &std::path::Path, session_id: &str) -> anyhow::Result<()> {
+        if path.exists() {
+            return Ok(());
+        }
+        if let Some(parent) = path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        let timestamp = iso_timestamp();
+        let entry = serde_json::json!({
+            "type": "session",
+            "version": 3,
+            "id": session_id,
+            "timestamp": timestamp,
+            "cwd": "/root",
+            "provider": "deepseek",
+            "modelId": "deepseek-chat",
+            "thinkingLevel": "off"
+        });
+        let mut content = serde_json::to_string(&entry)?;
+        content.push('\n');
+        tokio::fs::write(path, content).await?;
+        Ok(())
     }
 
     pub async fn remove(&self, session_id: &str) {
@@ -91,7 +117,7 @@ impl SessionManager {
         Ok(sessions)
     }
 
-    fn session_path(&self, id: &str) -> PathBuf {
+fn session_path(&self, id: &str) -> PathBuf {
         let mut path = self.config.sessions_dir.join(id);
         path.set_extension("jsonl");
         path
@@ -103,4 +129,52 @@ pub struct SessionInfo {
     pub id: String,
     pub file: String,
     pub active: bool,
+}
+
+
+fn iso_timestamp() -> String {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    let total_secs = now.as_secs();
+    let millis = now.subsec_millis();
+
+    let days = total_secs / 86400;
+    let secs_of_day = total_secs % 86400;
+    let hours = secs_of_day / 3600;
+    let minutes = (secs_of_day % 3600) / 60;
+    let seconds = secs_of_day % 60;
+
+    let mut y = 1970i64;
+    let mut remaining = days as i64;
+    loop {
+        let days_in_year = if is_leap(y) { 366 } else { 365 };
+        if remaining < days_in_year {
+            break;
+        }
+        remaining -= days_in_year;
+        y += 1;
+    }
+    let year = y;
+    let month_days = if is_leap(year) {
+        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    } else {
+        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    };
+    let mut month = 1u32;
+    for &md in &month_days {
+        if remaining < md {
+            break;
+        }
+        remaining -= md;
+        month += 1;
+    }
+    let day = remaining + 1;
+
+    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        year, month, day, hours, minutes, seconds, millis)
+}
+
+fn is_leap(year: i64) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
