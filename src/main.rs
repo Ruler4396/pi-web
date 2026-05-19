@@ -42,6 +42,11 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/api/health", get(|| async { "ok" }))
+        .route("/api/file/list", get(api::file::list))
+        .route("/api/file/read", get(api::file::read_file))
+        .route("/api/file/download", get(api::file::download))
+        .route("/api/file/write", axum::routing::post(api::file::write_file))
+        .route("/api/file/delete", axum::routing::post(api::file::delete_file))
         .route("/api/models", get(api::session::models))
         .route("/api/config", get(api::config::get_config))
         .route("/api/session", get(api::session::list).post(api::session::create))
