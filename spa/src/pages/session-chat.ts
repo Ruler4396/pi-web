@@ -13,6 +13,9 @@ export class SessionChat extends LitElement {
   @state() private error = "";
   @state() private cwd = "/root";
   @state() private showWelcome = true;
+  @state() private sidebarOpen = true;
+  @state() private sidebarWidth = 260;
+  @state() private resizing = false;
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
 
