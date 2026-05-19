@@ -53,7 +53,7 @@ async fn main() -> anyhow::Result<()> {
         .fallback(embed::spa_fallback)
         .with_state(state);
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], config.port));
+    let addr = SocketAddr::from(([127, 0, 0, 1], state.config.port));
     tracing::info!("pi-web listening on http://{addr}");
 
     let listener = TcpListener::bind(addr).await?;
