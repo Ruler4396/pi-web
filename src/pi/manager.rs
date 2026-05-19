@@ -79,9 +79,34 @@ impl SessionManager {
 
         // Remove session file if it exists
         let session_file = self.session_path(session_id);
+        let mut removed = false;
         if session_file.exists() {
-            if let Err(e) = std::fs::remove_file(&session_file) {
-                warn!(%session_id, error = %e, "failed to remove session file");
+            if std::fs::remove_file(&session_file).is_ok() {
+                removed = true;
+            }
+        }
+        // Also remove corresponding .lock file
+        let mut lock_file = session_file.clone();
+        lock_file.set_extension("jsonl.lock");
+        if lock_file.exists() {
+            let _ = std::fs::remove_file(&lock_file);
+        }
+        // Fallback: search subdirectories for legacy sessions
+        if !removed {
+            for entry in walkdir::WalkDir::new(&self.config.sessions_dir)
+                .max_depth(3)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                let stem = entry.path().file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                if stem == session_id {
+                    let _ = std::fs::remove_file(entry.path());
+                    let mut lf = entry.path().to_path_buf();
+                    lf.set_extension("jsonl.lock");
+                    let _ = std::fs::remove_file(&lf);
+                    info!(%session_id, path = %entry.path().display(), "session file removed (fallback)");
+                    break;
+                }
             }
         }
     }
@@ -98,7 +123,13 @@ impl SessionManager {
             .max_depth(3)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl"))
+            .filter(|e| {
+                // Skip legacy --root-- sessions (not managed by pi-web)
+                let path = e.path();
+                let is_jsonl = path.extension().map_or(false, |ext| ext == "jsonl");
+                let is_legacy = path.to_string_lossy().contains("--root--");
+                is_jsonl && !is_legacy
+            })
         {
             let path = entry.path().to_path_buf();
 
