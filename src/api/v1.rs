@@ -42,7 +42,7 @@ fn session_info_from_line(line: &str) -> Option<Value> {
     let sid = v["id"].as_str()?;
     let ts = v["timestamp"].as_str().unwrap_or("");
     let created = iso_to_ms(ts);
-    let dir = v.get("directory").and_then(|d| d.as_str()).unwrap_or("/");
+    let dir = v.get("directory").and_then(|d| d.as_str()).unwrap_or("");
     Some(json!({
         "id": sid,
         "time": { "created": created, "updated": created },
@@ -263,9 +263,7 @@ pub async fn session_list(
     }
 
     for s in &mut sessions {
-        if s.get("directory").and_then(|d| d.as_str()).unwrap_or("").is_empty() {
-            s["directory"] = json!(dir_filter);
-        }
+        s["directory"] = json!(dir_filter);
     }
 
     sessions.sort_by(|a, b| {
