@@ -86,7 +86,10 @@ impl RpcCommand {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum AgentEvent {
     #[serde(rename = "agent_start")]
-    AgentStart { session_id: String },
+    AgentStart {
+        #[serde(rename = "sessionId")]
+        session_id: String,
+    },
     #[serde(rename = "agent_end")]
     AgentEnd { messages: Value, error: Option<String> },
     #[serde(rename = "message_start")]
@@ -101,21 +104,29 @@ pub enum AgentEvent {
     MessageEnd { message: Value },
     #[serde(rename = "tool_execution_start")]
     ToolExecutionStart {
+        #[serde(rename = "toolCallId")]
         tool_call_id: String,
+        #[serde(rename = "toolName")]
         tool_name: String,
         args: Value,
     },
     #[serde(rename = "tool_execution_update")]
     ToolExecutionUpdate {
+        #[serde(rename = "toolCallId")]
         tool_call_id: String,
+        #[serde(rename = "toolName")]
         tool_name: String,
+        #[serde(rename = "partialResult")]
         partial_result: Option<String>,
     },
     #[serde(rename = "tool_execution_end")]
     ToolExecutionEnd {
+        #[serde(rename = "toolCallId")]
         tool_call_id: String,
+        #[serde(rename = "toolName")]
         tool_name: String,
         result: Option<String>,
+        #[serde(rename = "isError")]
         is_error: Option<bool>,
     },
     #[serde(rename = "response")]
@@ -130,12 +141,15 @@ pub enum AgentEvent {
     #[serde(rename = "auto_compaction_end")]
     AutoCompactionEnd {
         aborted: bool,
+        #[serde(rename = "willRetry")]
         will_retry: Option<bool>,
     },
     #[serde(rename = "auto_retry_start")]
     AutoRetryStart {
         attempt: i32,
+        #[serde(rename = "maxAttempts")]
         max_attempts: i32,
+        #[serde(rename = "delayMs")]
         delay_ms: i64,
     },
     #[serde(rename = "auto_retry_end")]
@@ -144,6 +158,7 @@ pub enum AgentEvent {
     Error {
         id: Option<String>,
         error: String,
+        #[serde(rename = "errorHints")]
         error_hints: Option<String>,
     },
     #[serde(other)]
