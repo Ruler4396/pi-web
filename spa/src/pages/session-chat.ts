@@ -1,13 +1,91 @@
-import { LitElement, html } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { LitElement, html, css } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 import { ChatPanel } from "@earendil-works/pi-web-ui";
 import { HttpAgent } from "../http-agent";
 
 @customElement("session-chat")
 export class SessionChat extends LitElement {
   @property() sessionId = "";
+  @state() private ready = false;
+  @state() private error = "";
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
+
+  static styles = css`
+    :host {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .chat-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid #e5e7eb;
+      background: #fff;
+      flex-shrink: 0;
+      min-height: 40px;
+    }
+    .topbar a {
+      text-decoration: none;
+      color: #3b82f6;
+      font-size: 0.8125rem;
+      font-weight: 500;
+    }
+    .topbar a:hover { text-decoration: underline; }
+    .topbar .sid {
+      color: #9ca3af;
+      font-size: 0.75rem;
+      font-family: ui-monospace, monospace;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chat-area {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .loading-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 1rem;
+      color: #6b7280;
+      font-size: 0.875rem;
+    }
+    .error-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 0.75rem;
+      color: #dc2626;
+      font-size: 0.875rem;
+      text-align: center;
+      padding: 2rem;
+    }
+    .error-wrap button {
+      padding: 0.5rem 1rem;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8125rem;
+    }
+  `;
 
   createRenderRoot() {
     return this;
@@ -15,10 +93,13 @@ export class SessionChat extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
-    this.style.display = "flex";
-    this.style.flexDirection = "column";
-    this.style.height = "100%";
-    await this.initChat();
+    try {
+      await this.initChat();
+      this.ready = true;
+    } catch (e: any) {
+      this.error = e.message || "Failed to initialize chat";
+    }
+    this.requestUpdate();
   }
 
   async initChat() {
@@ -26,32 +107,51 @@ export class SessionChat extends LitElement {
     this.chatPanel = new ChatPanel();
     this.chatPanel.style.flex = "1";
     this.chatPanel.style.minHeight = "0";
+    this.chatPanel.style.display = "flex";
+    this.chatPanel.style.flexDirection = "column";
 
     await this.chatPanel.setAgent(this.agent as any, {
-      onBeforeSend: () => {
-        // Called before sending a message
-      },
+      onBeforeSend: () => {},
       onApiKeyRequired: async () => true,
     });
+  }
 
-    this.requestUpdate();
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.chatPanel?.remove();
+    this.chatPanel = undefined;
   }
 
   render() {
-    if (!this.chatPanel) {
-      return html`<div class="flex items-center justify-center h-full">
-        <div class="text-muted-foreground">Loading agent...</div>
-      </div>`;
-    }
-    return html`
-      <div class="flex flex-col h-full w-full">
-        <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-200 shrink-0">
-          <a href="#" class="text-sm text-blue-500 hover:text-blue-700" @click=${() => {
-            window.location.hash = "";
-          }}>← Sessions</a>
-          <span class="text-xs text-gray-400">${this.sessionId.slice(0, 8)}...</span>
+    if (this.error) {
+      return html`
+        <div class="error-wrap">
+          <div>⚠️ ${this.error}</div>
+          <button @click=${() => { this.error = ""; this.connectedCallback(); }}>
+            Retry
+          </button>
         </div>
-        ${this.chatPanel}
+      `;
+    }
+
+    if (!this.ready || !this.chatPanel) {
+      return html`
+        <div class="loading-wrap">
+          <div class="spinner"></div>
+          <span>Loading chat...</span>
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="chat-shell">
+        <div class="topbar">
+          <a href="#" @click=${(e: Event) => { e.preventDefault(); window.location.hash = ""; }}>
+            ← Sessions
+          </a>
+          <span class="sid">${this.sessionId.slice(0, 8)}...</span>
+        </div>
+        <div class="chat-area">${this.chatPanel}</div>
       </div>
     `;
   }
