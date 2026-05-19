@@ -190,7 +190,7 @@ class HttpAgentState implements AgentState {
   pendingToolCalls: Set<string> = new Set();
   streamingMessage?: any;
   errorMessage?: string;
-  model: Model<any> = { provider: "", id: "", label: "" } as any;
+  model: Model<any> = { provider: "deepseek", id: "deepseek-chat", label: "DeepSeek Chat" } as any;
 
   get tools(): AgentTool<any>[] {
     return this._tools;

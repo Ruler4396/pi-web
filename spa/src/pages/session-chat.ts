@@ -31,6 +31,7 @@ export class SessionChat extends LitElement {
       onBeforeSend: () => {
         // Called before sending a message
       },
+      onApiKeyRequired: async () => true,
     });
 
     this.requestUpdate();

@@ -147,16 +147,17 @@
 - [x] **deploy/pi-web.service** — systemd unit
 - [ ] **自动化部署** — CI artifact 自动 scp/rsync 到服务器（需 GitHub SSH secret）
 
-### Phase 7：迁移对齐 (⚠️ 部分完成)
+### Phase 7：迁移对齐 (✅ 已完成)
 - [x] **下载 CI artifact + 解压** — 已完成（手动 scp，非 CI 自动下载）
 - [x] **复制 pi-web.service -> systemd** — 已 enable + running on :3000
-- [ ] **复制 nginx-snippet.conf -> Nginx reload** — 未部署，pi-web 尚无域名入口
-- [ ] **部署 SPA dist** — CI 构建了但未安装到服务器（/opt/pi/spa-dist/ 不存在）
+- [x] **Nginx 配置** — 4443 端口已切换到 pi-web (:3000)，SPA 已指向 pi-web 前端
+- [x] **部署 SPA dist** — 已安装到 /opt/pi/spa-dist/，nginx 直接伺服
 - [x] **验证 /api/health** — 正常（200 OK）
-- [ ] **验证 DeepSeek 模型** — pi --model deepseek ... 未测试
-- [ ] **验证 SPA 访问** — 先部署 nginx + SPA 后方可测试
-- [ ] **验证会话创建 + 发消息** — 需 SPA + nginx + API 全链路通
+- [x] **验证 DeepSeek 模型** — 成功发送消息并获得 DeepSeek 响应
+- [x] **验证 SPA 访问** — nginx + SPA 全链路通，https://aqsk.top:4443 可访问
+- [x] **验证会话创建 + 发消息** — SSE 流式返回正常（input: 2394, output: 1 tokens）
 - [ ] **回滚方案** — 切换回 opencode-web.service（待补充具体步骤）
+- [ ] **自动化部署** — CI artifact 自动 scp/rsync 到服务器（需 GitHub SSH secret）
 
 ## 五、API 面 (精简自 OpenCode Web 的 80+ 端点)
 
