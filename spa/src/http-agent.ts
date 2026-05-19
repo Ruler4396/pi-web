@@ -13,6 +13,7 @@ export class HttpAgent {
   constructor(sessionId: string) {
     this.sessionId = sessionId;
     this._state = new HttpAgentState();
+    this._state.loadModels().catch(() => {});
     this.getApiKey = async () => undefined;
   }
 
@@ -203,9 +204,17 @@ export class HttpAgent {
 }
 
 class HttpAgentState implements AgentState {
-  systemPrompt = "";
+  systemPrompt = "You are a helpful AI assistant. Use tools when appropriate to read, write, edit files and run commands.";
   thinkingLevel: ThinkingLevel = "off";
-  private _tools: AgentTool<any>[] = [];
+  private _tools: AgentTool<any>[] = [
+    { name: "read_file", description: "Read file contents", parameters: {} },
+    { name: "write_file", description: "Write file contents", parameters: {} },
+    { name: "edit_file", description: "Edit file with search/replace", parameters: {} },
+    { name: "bash", description: "Execute shell command", parameters: {} },
+    { name: "glob", description: "Find files by pattern", parameters: {} },
+    { name: "grep", description: "Search file contents", parameters: {} },
+    { name: "web_fetch", description: "Fetch web page content", parameters: {} },
+  ];
   private _messages: any[] = [];
   isStreaming = false;
   pendingToolCalls: Set<string> = new Set();
@@ -231,5 +240,24 @@ class HttpAgentState implements AgentState {
 
   addMessage(msg: any) {
     this._messages = [...this._messages, msg];
+  }
+
+  availableModels: { provider: string; id: string; label: string }[] = [
+    { provider: "deepseek", id: "deepseek-chat", label: "DeepSeek Chat" },
+    { provider: "deepseek", id: "deepseek-reasoner", label: "DeepSeek R1" },
+    { provider: "anthropic", id: "claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+    { provider: "anthropic", id: "claude-haiku-4-5", label: "Claude Haiku 4.5" },
+  ];
+
+  async loadModels() {
+    try {
+      const res = await fetch("/api/models");
+      if (res.ok) {
+        const models = await res.json();
+        if (Array.isArray(models) && models.length > 0) {
+          this.availableModels = models;
+        }
+      }
+    } catch {}
   }
 }
