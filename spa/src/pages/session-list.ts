@@ -9,10 +9,12 @@ export class SessionList extends LitElement {
 
   static styles = css`
     :host {
+      flex: 1;
+      min-height: 0;
       display: flex;
       flex-direction: column;
-      height: 100%;
       max-width: 720px;
+      width: 100%;
       margin: 0 auto;
       padding: 2rem 1rem;
       font-family: system-ui, -apple-system, sans-serif;
@@ -29,6 +31,7 @@ export class SessionList extends LitElement {
       font-size: 1.5rem;
       font-weight: 700;
       color: #111;
+      margin: 0;
     }
     .btn-new {
       padding: 0.5rem 1.25rem;
@@ -172,13 +175,13 @@ export class SessionList extends LitElement {
   render() {
     return html`
       <div class="header">
-        <h1>💬 Sessions</h1>
+        <h1>Sessions</h1>
         <button class="btn-new" @click=${this.createSession} ?disabled=${this.loading}>
           + New Session
         </button>
       </div>
 
-      ${this.error ? html`<div class="error-msg">⚠️ ${this.error}</div>` : ""}
+      ${this.error ? html`<div class="error-msg">${this.error}</div>` : ""}
 
       ${this.loading
         ? html`<div class="loading-wrap"><div class="spinner"></div></div>`

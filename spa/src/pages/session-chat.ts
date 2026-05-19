@@ -12,17 +12,6 @@ export class SessionChat extends LitElement {
   private agent?: HttpAgent;
 
   static styles = css`
-    :host {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-    }
-    .chat-shell {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      width: 100%;
-    }
     .topbar {
       display: flex;
       align-items: center;
@@ -31,7 +20,6 @@ export class SessionChat extends LitElement {
       border-bottom: 1px solid #e5e7eb;
       background: #fff;
       flex-shrink: 0;
-      min-height: 40px;
     }
     .topbar a {
       text-decoration: none;
@@ -48,28 +36,22 @@ export class SessionChat extends LitElement {
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .chat-area {
-      flex: 1;
-      min-height: 0;
-      display: flex;
-      flex-direction: column;
-    }
     .loading-wrap {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100%;
       gap: 1rem;
       color: #6b7280;
       font-size: 0.875rem;
     }
     .error-wrap {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100%;
       gap: 0.75rem;
       color: #dc2626;
       font-size: 0.875rem;
@@ -93,6 +75,12 @@ export class SessionChat extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
+    // Set host layout via JS (bypasses light-DOM :host bug)
+    this.style.display = "flex";
+    this.style.flexDirection = "column";
+    this.style.flex = "1";
+    this.style.minHeight = "0";
+
     try {
       await this.initChat();
       this.ready = true;
@@ -105,10 +93,10 @@ export class SessionChat extends LitElement {
   async initChat() {
     this.agent = new HttpAgent(this.sessionId);
     this.chatPanel = new ChatPanel();
-    this.chatPanel.style.flex = "1";
-    this.chatPanel.style.minHeight = "0";
     this.chatPanel.style.display = "flex";
     this.chatPanel.style.flexDirection = "column";
+    this.chatPanel.style.flex = "1";
+    this.chatPanel.style.minHeight = "0";
 
     await this.chatPanel.setAgent(this.agent as any, {
       onBeforeSend: () => {},
@@ -126,7 +114,7 @@ export class SessionChat extends LitElement {
     if (this.error) {
       return html`
         <div class="error-wrap">
-          <div>⚠️ ${this.error}</div>
+          <div>Failed to load: ${this.error}</div>
           <button @click=${() => { this.error = ""; this.connectedCallback(); }}>
             Retry
           </button>
@@ -144,14 +132,14 @@ export class SessionChat extends LitElement {
     }
 
     return html`
-      <div class="chat-shell">
+      <div style="flex:1;min-height:0;display:flex;flex-direction:column">
         <div class="topbar">
           <a href="#" @click=${(e: Event) => { e.preventDefault(); window.location.hash = ""; }}>
             ← Sessions
           </a>
           <span class="sid">${this.sessionId.slice(0, 8)}...</span>
         </div>
-        <div class="chat-area">${this.chatPanel}</div>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column">${this.chatPanel}</div>
       </div>
     `;
   }
