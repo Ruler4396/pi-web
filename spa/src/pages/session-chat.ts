@@ -169,8 +169,10 @@ export class SessionChat extends LitElement {
           id: m.id || crypto.randomUUID(),
           sessionID: this.sessionId,
           role: m.role || "user",
-          content: typeof m.content === "string" ? m.content :
-            Array.isArray(m.content) ? m.content.map((p: any) => p.text || "").join("") : "",
+          content: Array.isArray(m.content)
+            ? m.content
+            : [{ type: "text", text: typeof m.content === "string" ? m.content : JSON.stringify(m.content) }],
+          stopReason: m.stopReason || "end_turn",
         }));
         this.showWelcome = false;
       } else {

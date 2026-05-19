@@ -51,7 +51,7 @@ export class HttpAgent {
       messageText = "";
     }
 
-    this._state.addMessage({ role: "user", content: messageText });
+    this._state.addMessage({ role: "user", content: [{ type: "text", text: messageText }] });
     this._state.isStreaming = true;
     this._state.errorMessage = undefined;
 
@@ -104,7 +104,8 @@ export class HttpAgent {
                   id: raw.message?.id || crypto.randomUUID(),
                   sessionID: this.sessionId,
                   role: "assistant",
-                  content: "",
+                  content: [] as any[],
+                  stopReason: null,
                 };
                 this._state.addMessage(msg);
                 await this.emit({ type: "message_start", message: msg });
@@ -117,10 +118,11 @@ export class HttpAgent {
                   currentAssistantContent += delta;
                   if (this._state.messages.length > 0) {
                     const lastMsg = this._state.messages[this._state.messages.length - 1] as any;
-                    lastMsg.content = currentAssistantContent;
+                    // Content must be an array of {type, text} chunks for ChatPanel
+                    lastMsg.content = [{ type: "text", text: currentAssistantContent }];
                   }
                 }
-                const updateMsg = this._state.messages[this._state.messages.length - 1] || { role: "assistant", content: currentAssistantContent };
+                const updateMsg = this._state.messages[this._state.messages.length - 1] || { role: "assistant", content: [{ type: "text", text: currentAssistantContent }] };
                 await this.emit({
                   type: "message_update",
                   message: updateMsg,
@@ -134,8 +136,11 @@ export class HttpAgent {
               case "message_end": {
                 const msgRole = raw.message?.role;
                 if (msgRole === "user") break;
-                const endMsg = this._state.messages[this._state.messages.length - 1] || { role: "assistant", content: currentAssistantContent };
-                await this.emit({ type: "message_end", message: endMsg });
+                const endMsg = this._state.messages[this._state.messages.length - 1];
+                if (endMsg) {
+                  (endMsg as any).stopReason = "end_turn";
+                }
+                await this.emit({ type: "message_end", message: endMsg || { role: "assistant", content: [{ type: "text", text: currentAssistantContent }] } });
                 break;
               }
               case "tool_execution_start":
@@ -159,6 +164,7 @@ export class HttpAgent {
                 break;
               case "agent_end": {
                 const finalMsg = this._state.messages[this._state.messages.length - 1];
+                if (finalMsg) (finalMsg as any).stopReason = "end_turn";
                 await this.emit({
                   type: "agent_end",
                   messages: finalMsg ? [finalMsg] : [],
@@ -175,12 +181,12 @@ export class HttpAgent {
       }
 
       if (!messageSent && !this._aborted) {
-        this._state.addMessage({ role: "assistant", content: currentAssistantContent || "(no response)" });
+        this._state.addMessage({ role: "assistant", content: [{ type: "text", text: currentAssistantContent || "(no response)" }] });
       }
     } catch (err: any) {
       if (err.name === "AbortError") return;
       this._state.errorMessage = err.message;
-      this._state.addMessage({ role: "assistant", content: `Error: ${err.message}` });
+      this._state.addMessage({ role: "assistant", content: [{ type: "text", text: `Error: ${err.message}` }], stopReason: "error", errorMessage: err.message });
     } finally {
       this._state.isStreaming = false;
       this.abortController = null;
