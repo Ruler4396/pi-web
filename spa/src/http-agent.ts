@@ -4,7 +4,7 @@ import type { Model } from "@earendil-works/pi-ai";
 export class HttpAgent {
   sessionId: string;
   streamFn: any;
-  getApiKey?: (provider: string) => Promise<string | undefined>;
+  getApiKey: (provider: string) => Promise<string | undefined>;
   private _state: HttpAgentState;
   private listeners: Set<(event: AgentEvent, signal: AbortSignal) => void | Promise<void>> = new Set();
   private abortController: AbortController | null = null;
@@ -13,6 +13,7 @@ export class HttpAgent {
   constructor(sessionId: string) {
     this.sessionId = sessionId;
     this._state = new HttpAgentState();
+    this.getApiKey = async () => undefined;
   }
 
   get state(): AgentState {
@@ -49,7 +50,7 @@ export class HttpAgent {
     this._state.isStreaming = true;
     this._state.errorMessage = undefined;
 
-    await this.emit({ type: "agent_start" });
+    await this.emit({ type: "agent_start", sessionId: this.sessionId } as any);
 
     try {
       const res = await fetch(`/api/session/${this.sessionId}/message`, {
@@ -89,16 +90,25 @@ export class HttpAgent {
 
             switch (eventType) {
               case "message_start": {
+                const msgRole = raw.message?.role;
+                if (msgRole === "user") break;
+
                 messageSent = true;
                 currentAssistantContent = "";
-                const msg: any = { role: "assistant", content: "" };
+                const msg: any = {
+                  id: raw.message?.id || crypto.randomUUID(),
+                  sessionID: this.sessionId,
+                  role: "assistant",
+                  content: "",
+                };
                 this._state.addMessage(msg);
                 await this.emit({ type: "message_start", message: msg });
                 break;
               }
               case "message_update": {
-                if (raw.assistantMessageEvent?.delta || raw.assistantMessageEvent?.text) {
-                  const delta = raw.assistantMessageEvent.delta || raw.assistantMessageEvent.text || "";
+                const deltaEvent = raw.assistantMessageEvent || {};
+                const delta = deltaEvent.delta || deltaEvent.text || "";
+                if (delta) {
                   currentAssistantContent += delta;
                   if (this._state.messages.length > 0) {
                     const lastMsg = this._state.messages[this._state.messages.length - 1] as any;
@@ -109,11 +119,13 @@ export class HttpAgent {
                 await this.emit({
                   type: "message_update",
                   message: updateMsg,
-                  assistantMessageEvent: raw.assistantMessageEvent || {},
+                  assistantMessageEvent: deltaEvent,
                 } as any);
                 break;
               }
               case "message_end": {
+                const msgRole = raw.message?.role;
+                if (msgRole === "user") break;
                 const endMsg = this._state.messages[this._state.messages.length - 1] || { role: "assistant", content: currentAssistantContent };
                 await this.emit({ type: "message_end", message: endMsg });
                 break;
