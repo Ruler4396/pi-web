@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RpcCommand {
     #[serde(rename = "type")]
     pub command_type: String,
@@ -11,9 +12,9 @@ pub struct RpcCommand {
     pub message: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
-    #[serde(rename = "modelId", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub model_id: Option<String>,
-    #[serde(rename = "sessionId", skip_serializing_if = "Option::is_none")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
     #[serde(flatten)]
     pub extra: Value,
@@ -82,7 +83,7 @@ impl RpcCommand {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum AgentEvent {
     #[serde(rename = "agent_start")]
     AgentStart { session_id: String },

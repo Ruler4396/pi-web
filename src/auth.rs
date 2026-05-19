@@ -41,9 +41,9 @@ fn is_authenticated(headers: &HeaderMap, expected_token: &str) -> bool {
     let Some(encoded) = auth_str.strip_prefix("Basic ") else {
         return false;
     };
-    // Strip padding before decoding (BASE64URL_NOPAD rejects padding)
-    let encoded = encoded.trim_end_matches('=');
-    let Ok(decoded) = data_encoding::BASE64URL_NOPAD.decode(encoded.as_bytes()) else {
+    // Decode standard Base64 (with or without padding)
+    // BASE64 handles padding automatically
+    let Ok(decoded) = data_encoding::BASE64.decode(encoded.as_bytes()) else {
         return false;
     };
 

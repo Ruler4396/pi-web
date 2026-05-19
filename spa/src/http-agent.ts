@@ -97,8 +97,8 @@ export class HttpAgent {
                 break;
               }
               case "message_update": {
-                if (raw.delta?.text || raw.delta?.TextDelta) {
-                  const delta = raw.delta.text || raw.delta.TextDelta || "";
+                if (raw.assistantMessageEvent?.delta || raw.assistantMessageEvent?.text) {
+                  const delta = raw.assistantMessageEvent.delta || raw.assistantMessageEvent.text || "";
                   currentAssistantContent += delta;
                   if (this._state.messages.length > 0) {
                     const lastMsg = this._state.messages[this._state.messages.length - 1] as any;
@@ -109,7 +109,7 @@ export class HttpAgent {
                 await this.emit({
                   type: "message_update",
                   message: updateMsg,
-                  assistantMessageEvent: raw.delta || {},
+                  assistantMessageEvent: raw.assistantMessageEvent || {},
                 } as any);
                 break;
               }
