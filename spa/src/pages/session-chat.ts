@@ -1,6 +1,6 @@
 import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { ChatPanel } from "@earendil-works/pi-web-ui";
+import { ChatPanel, AgentInterface, ArtifactsPanel } from "@earendil-works/pi-web-ui";
 import { HttpAgent } from "../http-agent";
 
 @customElement("session-chat")
@@ -119,7 +119,16 @@ export class SessionChat extends LitElement {
       await this.loadHistory();
       this.ready = true;
     } catch (e: any) {
-      this.error = e.message || "Failed to initialize chat";
+      const msg = e.message || String(e);
+      if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+        this.error = "Connection lost. Check your network and try again.";
+      } else if (msg.includes("pi") || msg.includes("process")) {
+        this.error = "Agent process failed. Please create a new session.";
+      } else if (msg.includes("500") || msg.includes("502")) {
+        this.error = "Server error. The agent may be overloaded. Try again later.";
+      } else {
+        this.error = msg || "Failed to initialize chat";
+      }
     }
     this.requestUpdate();
   }
@@ -145,6 +154,10 @@ export class SessionChat extends LitElement {
       },
       onCostClick: () => {
         // Could show token usage popup
+      },
+      sandboxUrlProvider: () => "",
+      toolsFactory: (_agent: any, _agentInterface: AgentInterface, _artifactsPanel: ArtifactsPanel) => {
+        return this.agent ? this.agent.state.tools : [];
       },
     });
   }
@@ -220,6 +233,17 @@ export class SessionChat extends LitElement {
     }
   }
 
+  renameSession() {
+    const newName = prompt("Session name:", this.sessionId.slice(0, 8));
+    if (newName && newName !== this.sessionId.slice(0, 8)) {
+      fetch(`/api/session/${this.sessionId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      }).catch(() => {});
+    }
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
     this.chatPanel?.remove();
@@ -259,7 +283,7 @@ export class SessionChat extends LitElement {
             ← Sessions
           </a>
           <span class="divider">·</span>
-          <span class="sid">${this.sessionId.slice(0, 8)}</span>
+          <span class="sid" @click=${() => this.renameSession()} title="Click to rename session">${this.sessionId.slice(0, 8)}</span>
           <span class="divider">·</span>
           <span class="cwd" @click=${() => this.editCwd()} title="Click to change working directory">
             ${this.cwd}
