@@ -9,7 +9,7 @@ export class SessionChat extends LitElement {
   @state() private ready = false;
   @state() private error = "";
   @state() private cwd = "/root";
-  @state() private showWelcome = false;
+  @state() private showWelcome = true;
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
 
