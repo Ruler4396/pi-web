@@ -2,6 +2,9 @@ import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { ChatPanel, AgentInterface, ArtifactsPanel } from "@earendil-works/pi-web-ui";
 import { HttpAgent } from "../http-agent";
+import "../components/file-tree";
+import "../components/file-context-menu";
+import "../components/file-upload";
 
 @customElement("session-chat")
 export class SessionChat extends LitElement {
@@ -229,6 +232,48 @@ export class SessionChat extends LitElement {
         body: JSON.stringify({ cwd: newCwd }),
       }).catch(() => {});
       this.requestUpdate();
+    }
+  }
+
+  private startResize(e: MouseEvent) {
+    e.preventDefault();
+    this.resizing = true;
+    const startX = e.clientX;
+    const startW = this.sidebarWidth;
+    const onMove = (ev: MouseEvent) => {
+      this.sidebarWidth = Math.max(180, Math.min(500, startW + (ev.clientX - startX)));
+    };
+    const onUp = () => {
+      this.resizing = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }
+
+  private onFileContextMenu(e: CustomEvent) {
+    const menu = this.querySelector("file-context-menu") || document.createElement("file-context-menu");
+    if (!menu.parentElement) this.appendChild(menu);
+    (menu as any).show(e.detail.node, e.detail.x, e.detail.y);
+  }
+
+  private onFileSelect(e: CustomEvent) {
+    // Could preview file content
+  }
+
+  private onFileChanged() {
+    const tree = this.querySelector("file-tree") as any;
+    if (tree) tree.loadDir(this.cwd);
+  }
+
+  private onFileOpen(e: CustomEvent) {
+    const node = e.detail;
+    const textarea = this.querySelector("textarea") as HTMLTextAreaElement;
+    if (textarea) {
+      textarea.value = `Read the file: ${node.path}`;
+      textarea.focus();
+      textarea.dispatchEvent(new Event("input", { bubbles: true }));
     }
   }
 
