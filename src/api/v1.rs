@@ -323,22 +323,6 @@ pub async fn message_send(
                             accumulated_text = String::new();
                         }
                         AgentEvent::MessageUpdate { message, delta } => {
-                            if let Some(content_arr) = delta.get("partial").and_then(|p| p.get("content")).and_then(|c| c.as_array()) {
-                                for item in content_arr {
-                                    if let Some(text) = item["text"].as_str() {
-                                        if !text.is_empty() {
-                                            accumulated_text.push_str(text);
-                                            yield Ok(Event::default().event("message.part.delta").data(json!({
-                                                "sessionID": sid,
-                                                "messageID": assistant_msg_id,
-                                                "partID": assistant_part_id,
-                                                "field": "text",
-                                                "delta": text,
-                                            }).to_string()));
-                                        }
-                                    }
-                                }
-                            }
                             if let Some(delta_text) = delta.get("delta").and_then(|d| d.as_str()) {
                                 if !delta_text.is_empty() {
                                     accumulated_text.push_str(delta_text);
