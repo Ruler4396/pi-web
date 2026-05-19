@@ -1,7 +1,7 @@
 import "./app.css";
 import { html, render } from "lit";
-import { SessionList } from "./pages/session-list";
-import { SessionChat } from "./pages/session-chat";
+import "./pages/session-list";
+import "./pages/session-chat";
 
 class AppRoot {
   currentRoute = "";
