@@ -123,13 +123,7 @@ impl SessionManager {
             .max_depth(3)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                // Skip legacy --root-- sessions (not managed by pi-web)
-                let path = e.path();
-                let is_jsonl = path.extension().map_or(false, |ext| ext == "jsonl");
-                let is_legacy = path.to_string_lossy().contains("--root--");
-                is_jsonl && !is_legacy
-            })
+            .filter(|e| e.path().extension().map_or(false, |ext| ext == "jsonl"))
         {
             let path = entry.path().to_path_buf();
 
