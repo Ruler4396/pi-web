@@ -54,6 +54,9 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/session/{id}/message", get(api::message::list).post(api::message::send))
         .route("/api/session/{id}/abort", axum::routing::post(api::session::abort))
         .route("/api/session/{id}/model", axum::routing::post(api::session::set_model))
+        .route("/api/session/{id}/export", get(api::session::export_session))
+        .route("/api/session/{id}/archive", axum::routing::post(api::session::archive_session))
+        .route("/api/session/{id}/restore", axum::routing::post(api::session::restore_session))
         .route("/api/event", get(api::event::stream))
         // Old SPA-compatible endpoints
         .route("/global/health", get(api::v1::global_health))

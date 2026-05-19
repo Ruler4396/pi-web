@@ -79,6 +79,74 @@ pub async fn models() -> Result<Json<serde_json::Value>, StatusCode> {
     ])))
 }
 
+pub async fn export_session(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<axum::response::Response, StatusCode> {
+    let agent = state.sessions.get_or_create(&id).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let mut rx = agent.subscribe();
+    let cmd = crate::pi::protocol::RpcCommand::get_messages();
+    let req_id = agent.send_command(&cmd).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let deadline = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        loop {
+            match rx.recv().await {
+                Ok(crate::pi::protocol::AgentEvent::CommandResponse { id, data, .. }) if id == req_id => {
+                    return data.unwrap_or(serde_json::json!({"messages": []}));
+                }
+                Ok(_) => continue,
+                Err(_) => return serde_json::json!({"messages": []}),
+            }
+        }
+    });
+    let data = deadline.await.unwrap_or(serde_json::json!({"messages": []}));
+
+    let messages = data.get("messages").and_then(|m| m.as_array()).cloned().unwrap_or_default();
+    let mut md = String::from("# Session Export\n\n");
+    for msg in &messages {
+        let role = msg["role"].as_str().unwrap_or("unknown");
+        let content = msg["content"].as_str().unwrap_or("");
+        md.push_str(&format!("### {}\n{}\n\n", role, content));
+    }
+
+    Ok(axum::response::Response::builder()
+        .header("Content-Type", "text/markdown; charset=utf-8")
+        .header("Content-Disposition", format!("attachment; filename=\"session-{}.md\"", &id[..8.min(id.len())]))
+        .body(axum::body::Body::from(md))
+        .unwrap())
+}
+
+pub async fn archive_session(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, StatusCode> {
+    let session_file = state.sessions.session_path(&id);
+    let archived_dir = state.config.sessions_dir.join(".archived");
+    std::fs::create_dir_all(&archived_dir).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if let Some(fname) = session_file.file_name() {
+        let dest = archived_dir.join(fname);
+        std::fs::rename(&session_file, &dest).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }
+    state.sessions.remove(&id).await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn restore_session(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, StatusCode> {
+    let archived_dir = state.config.sessions_dir.join(".archived");
+    let src = archived_dir.join(format!("{}.jsonl", id));
+    if !src.exists() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    let dest = state.config.sessions_dir.join(format!("{}.jsonl", id));
+    std::fs::rename(&src, &dest).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
 pub async fn abort(
     State(state): State<AppState>,
     Path(id): Path<String>,

@@ -5,6 +5,8 @@ import { HttpAgent } from "../http-agent";
 import "../components/file-tree";
 import "../components/file-context-menu";
 import "../components/file-upload";
+import "../components/slash-commands";
+import "../components/session-stats";
 
 @customElement("session-chat")
 export class SessionChat extends LitElement {
@@ -137,6 +139,57 @@ export class SessionChat extends LitElement {
       }
     }
     this.requestUpdate();
+    this.setupKeyboard();
+  }
+
+  setupKeyboard() {
+    const handler = (e: KeyboardEvent) => {
+      const textarea = this.querySelector("textarea") as HTMLTextAreaElement;
+      const slash = this.querySelector("slash-commands") as any;
+
+      if (e.key === "/" && document.activeElement === textarea && !textarea.value) {
+        const rect = textarea.getBoundingClientRect();
+        if (slash) {
+          slash.position = { x: rect.left, y: rect.bottom - 310 };
+          slash.filter = "";
+          slash.visible = true;
+          slash.requestUpdate();
+        }
+        return;
+      }
+      if (slash && slash.visible) {
+        if (e.key === "Escape") { slash.visible = false; e.preventDefault(); return; }
+        if (e.key === "ArrowDown") { slash.navigateDown(); e.preventDefault(); return; }
+        if (e.key === "ArrowUp") { slash.navigateUp(); e.preventDefault(); return; }
+        if (e.key === "Enter") {
+          const sel = slash.getSelected();
+          if (sel) { this.onSlashSelect(new CustomEvent("x", { detail: sel })); slash.visible = false; }
+          e.preventDefault();
+          return;
+        }
+        if (e.key.length === 1) {
+          const val = textarea ? textarea.value : "";
+          slash.filter = val.slice(val.lastIndexOf("/"));
+          return;
+        }
+      }
+
+      if (e.ctrlKey && e.key === "b") { this.sidebarOpen = !this.sidebarOpen; e.preventDefault(); }
+      if (e.key === "Escape" && !(slash && slash.visible)) { this.agent?.abort(); }
+      if (e.ctrlKey && e.key === "Enter") {
+        const btns = this.querySelectorAll("button");
+        for (let i = 0; i < btns.length; i++) {
+          const r = btns[i].getBoundingClientRect();
+          if (r.width === 32 && r.height === 32 && r.left > 600) { btns[i].click(); break; }
+        }
+        e.preventDefault();
+      }
+      if (e.ctrlKey && e.key === "l") {
+        if (textarea) { textarea.value = ""; textarea.focus(); }
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("keydown", handler);
   }
 
   async initChat() {
@@ -280,6 +333,96 @@ export class SessionChat extends LitElement {
     }
   }
 
+  private onSlashSelect(e: CustomEvent) {
+    const cmd = e.detail;
+    const textarea = this.querySelector("textarea") as HTMLTextAreaElement;
+    if (!textarea) return;
+    if (cmd.action === "clear") textarea.value = "";
+    else if (cmd.action === "model") this.showModelPicker();
+    else if (cmd.action === "export") this.exportSession();
+    else if (cmd.action === "help") this.showHelp();
+    else textarea.value = cmd.name + " ";
+    textarea.focus();
+  }
+
+  private showHelp() {
+    alert("Keyboard Shortcuts:\n\nCtrl+B - Toggle sidebar\nEscape - Stop generation\nCtrl+Enter - Send message\nCtrl+L - Clear input\n/ - Slash commands");
+  }
+
+  private async exportSession() {
+    try {
+      const res = await fetch(`/api/session/${this.sessionId}/export`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `session-${this.sessionId.slice(0, 8)}.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch {}
+  }
+
+  private onThinkingClick() {
+    const levels = ["off", "minimal", "low", "medium", "high", "xhigh"];
+    const current = (this.agent?.state?.thinkingLevel as string) || "off";
+    const next = levels[(levels.indexOf(current) + 1) % levels.length];
+    this.agent?.setThinking(next);
+    this.requestUpdate();
+    this.setupKeyboard();
+  }
+
+  setupKeyboard() {
+    const handler = (e: KeyboardEvent) => {
+      const textarea = this.querySelector("textarea") as HTMLTextAreaElement;
+      const slash = this.querySelector("slash-commands") as any;
+
+      if (e.key === "/" && document.activeElement === textarea && !textarea.value) {
+        const rect = textarea.getBoundingClientRect();
+        if (slash) {
+          slash.position = { x: rect.left, y: rect.bottom - 310 };
+          slash.filter = "";
+          slash.visible = true;
+          slash.requestUpdate();
+        }
+        return;
+      }
+      if (slash && slash.visible) {
+        if (e.key === "Escape") { slash.visible = false; e.preventDefault(); return; }
+        if (e.key === "ArrowDown") { slash.navigateDown(); e.preventDefault(); return; }
+        if (e.key === "ArrowUp") { slash.navigateUp(); e.preventDefault(); return; }
+        if (e.key === "Enter") {
+          const sel = slash.getSelected();
+          if (sel) { this.onSlashSelect(new CustomEvent("x", { detail: sel })); slash.visible = false; }
+          e.preventDefault();
+          return;
+        }
+        if (e.key.length === 1) {
+          const val = textarea ? textarea.value : "";
+          slash.filter = val.slice(val.lastIndexOf("/"));
+          return;
+        }
+      }
+
+      if (e.ctrlKey && e.key === "b") { this.sidebarOpen = !this.sidebarOpen; e.preventDefault(); }
+      if (e.key === "Escape" && !(slash && slash.visible)) { this.agent?.abort(); }
+      if (e.ctrlKey && e.key === "Enter") {
+        const btns = this.querySelectorAll("button");
+        for (let i = 0; i < btns.length; i++) {
+          const r = btns[i].getBoundingClientRect();
+          if (r.width === 32 && r.height === 32 && r.left > 600) { btns[i].click(); break; }
+        }
+        e.preventDefault();
+      }
+      if (e.ctrlKey && e.key === "l") {
+        if (textarea) { textarea.value = ""; textarea.focus(); }
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("keydown", handler);
+  }
+
   renameSession() {
     const newName = prompt("Session name:", this.sessionId.slice(0, 8));
     if (newName && newName !== this.sessionId.slice(0, 8)) {
@@ -405,5 +548,56 @@ export class SessionChat extends LitElement {
     }
     this.showWelcome = false;
     this.requestUpdate();
+    this.setupKeyboard();
+  }
+
+  setupKeyboard() {
+    const handler = (e: KeyboardEvent) => {
+      const textarea = this.querySelector("textarea") as HTMLTextAreaElement;
+      const slash = this.querySelector("slash-commands") as any;
+
+      if (e.key === "/" && document.activeElement === textarea && !textarea.value) {
+        const rect = textarea.getBoundingClientRect();
+        if (slash) {
+          slash.position = { x: rect.left, y: rect.bottom - 310 };
+          slash.filter = "";
+          slash.visible = true;
+          slash.requestUpdate();
+        }
+        return;
+      }
+      if (slash && slash.visible) {
+        if (e.key === "Escape") { slash.visible = false; e.preventDefault(); return; }
+        if (e.key === "ArrowDown") { slash.navigateDown(); e.preventDefault(); return; }
+        if (e.key === "ArrowUp") { slash.navigateUp(); e.preventDefault(); return; }
+        if (e.key === "Enter") {
+          const sel = slash.getSelected();
+          if (sel) { this.onSlashSelect(new CustomEvent("x", { detail: sel })); slash.visible = false; }
+          e.preventDefault();
+          return;
+        }
+        if (e.key.length === 1) {
+          const val = textarea ? textarea.value : "";
+          slash.filter = val.slice(val.lastIndexOf("/"));
+          return;
+        }
+      }
+
+      if (e.ctrlKey && e.key === "b") { this.sidebarOpen = !this.sidebarOpen; e.preventDefault(); }
+      if (e.key === "Escape" && !(slash && slash.visible)) { this.agent?.abort(); }
+      if (e.ctrlKey && e.key === "Enter") {
+        const btns = this.querySelectorAll("button");
+        for (let i = 0; i < btns.length; i++) {
+          const r = btns[i].getBoundingClientRect();
+          if (r.width === 32 && r.height === 32 && r.left > 600) { btns[i].click(); break; }
+        }
+        e.preventDefault();
+      }
+      if (e.ctrlKey && e.key === "l") {
+        if (textarea) { textarea.value = ""; textarea.focus(); }
+        e.preventDefault();
+      }
+    };
+    document.addEventListener("keydown", handler);
   }
 }

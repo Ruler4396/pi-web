@@ -205,6 +205,40 @@ export class HttpAgent {
     }).catch(() => {});
   }
 
+  async setThinking(level: string): Promise<void> {
+    this._state.thinkingLevel = level as any;
+    await fetch(`/api/session/${this.sessionId}/model`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: this._state.model.provider,
+        modelId: this._state.model.id,
+        thinkingLevel: level,
+      }),
+    }).catch(() => {});
+  }
+
+  getStats() {
+    return {
+      messageCount: this._state.messages.length,
+      isStreaming: this._state.isStreaming,
+      model: this._state.model.label || this._state.model.id,
+      thinkingLevel: this._state.thinkingLevel,
+    };
+  }
+
+  exportMarkdown(): string {
+    const lines = ["# Session Export\n"];
+    for (const msg of this._state.messages) {
+      const role = msg.role || "unknown";
+      const content = Array.isArray(msg.content)
+        ? msg.content.map((c: any) => c.text || "").join("\n")
+        : String(msg.content || "");
+      lines.push(`### ${role}\n${content}\n`);
+    }
+    return lines.join("\n");
+  }
+
   abort() {
     this._aborted = true;
     this.abortController?.abort();
