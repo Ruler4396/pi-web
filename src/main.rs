@@ -42,9 +42,10 @@ async fn main() -> anyhow::Result<()> {
 
     let app = Router::new()
         .route("/api/health", get(|| async { "ok" }))
+        .route("/api/models", get(api::session::models))
         .route("/api/config", get(api::config::get_config))
         .route("/api/session", get(api::session::list).post(api::session::create))
-        .route("/api/session/{id}", get(api::session::get).delete(api::session::delete))
+        .route("/api/session/{id}", get(api::session::get).delete(api::session::delete).patch(api::session::update))
         .route("/api/session/{id}/message", get(api::message::list).post(api::message::send))
         .route("/api/session/{id}/abort", axum::routing::post(api::session::abort))
         .route("/api/session/{id}/model", axum::routing::post(api::session::set_model))

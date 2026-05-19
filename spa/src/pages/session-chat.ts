@@ -116,6 +116,7 @@ export class SessionChat extends LitElement {
 
     try {
       await this.initChat();
+      await this.loadHistory();
       this.ready = true;
     } catch (e: any) {
       this.error = e.message || "Failed to initialize chat";

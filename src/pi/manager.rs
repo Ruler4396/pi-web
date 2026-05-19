@@ -142,7 +142,7 @@ impl SessionManager {
         Ok(sessions)
     }
 
-fn session_path(&self, id: &str) -> PathBuf {
+pub fn session_path(&self, id: &str) -> PathBuf {
         let mut path = self.config.sessions_dir.join(id);
         path.set_extension("jsonl");
         path
