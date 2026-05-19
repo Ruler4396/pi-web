@@ -17,6 +17,6 @@ tower-http = { version = "0.6", features = ["cors"] }
 anyhow = "1"
 futures = "0.3"
 async-stream = "0.3"
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["sync"] }
 walkdir = "2"
 data-encoding = "2"
