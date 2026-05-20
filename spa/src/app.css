@@ -266,6 +266,67 @@ message-editor .bg-card:focus-within {
 }
 
 [data-theme="dark"] body { background: var(--bg-base); color: var(--text-base); }
+/* File tree */
+file-tree {
+  display: block;
+  overflow-y: auto;
+  font-size: 13px;
+  user-select: none;
+}
+.tree-node {
+  display: flex !important;
+  align-items: center !important;
+  padding: 3px 8px !important;
+  cursor: pointer;
+  border-radius: 4px;
+  gap: 6px;
+  white-space: nowrap;
+  color: var(--text-base, #6f6f6f);
+  line-height: 1.4;
+}
+.tree-node:hover { background: rgba(0,0,0,0.04); }
+.tree-node.selected { background: rgba(37,99,235,0.08); color: #2563eb; }
+.tree-node .icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--text-weak, #8f8f8f);
+}
+.tree-node.selected .icon { color: #2563eb; }
+.tree-node .name { overflow: hidden; text-overflow: ellipsis; line-height: 1.4; }
+.ext-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  line-height: 14px;
+  opacity: 0.7;
+}
+.size { margin-left: auto; color: var(--text-weaker, #b0b0b0); font-size: 11px; flex-shrink: 0; }
+.children { padding-left: 16px; }
+.loading-text, .empty-text { padding: 8px; color: var(--text-weaker, #b0b0b0); font-size: 12px; }
+
+/* Model selector inside message-editor */
+message-editor button[class*="inline-flex"] {
+  transition: background 0.1s, color 0.1s !important;
+}
+message-editor button[class*="inline-flex"]:hover {
+  background: rgba(0,0,0,0.04) !important;
+  color: var(--text-strong, #171717) !important;
+}
+/* Send button */
+message-editor button[class*="inline-flex"]:has(svg) {
+  color: var(--text-weak, #8f8f8f) !important;
+}
+message-editor button[class*="inline-flex"]:has(svg):hover {
+  color: #2563eb !important;
+  background: rgba(37,99,235,0.06) !important;
+}
+
+/* Dark mode */
 [data-theme="dark"] .sidebar { background: var(--bg-base); }
 [data-theme="dark"] .tree-node:hover { background: rgba(255,255,255,0.06); }
 [data-theme="dark"] .tree-node.selected { background: rgba(255,255,255,0.08); color: var(--accent); }

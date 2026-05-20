@@ -45,7 +45,7 @@ pub async fn list(
     if !dir.exists() || !dir.is_dir() {
         return Err(StatusCode::NOT_FOUND);
     }
-    let nodes = read_dir_nodes(&dir, &dir, 2);
+    let nodes = read_dir_nodes(&dir, &dir, 4);
     Ok(Json(nodes))
 }
 
