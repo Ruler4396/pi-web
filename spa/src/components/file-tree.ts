@@ -47,14 +47,36 @@ export class FileTree extends LitElement {
     this.requestUpdate();
   }
 
-  toggle(dir: FileNode, e: Event) {
+  async toggle(dir: FileNode, e: Event) {
     e.stopPropagation();
     if (this.expanded.has(dir.path)) {
       this.expanded.delete(dir.path);
-    } else {
-      this.expanded.add(dir.path);
+      this.requestUpdate();
+      return;
+    }
+    this.expanded.add(dir.path);
+    if (dir.children === undefined || dir.children.length === 0) {
+      try {
+        const res = await fetch("/api/file/list?path=" + encodeURIComponent(this.rootPath.replace(/\/+$/, "") + "/" + dir.path));
+        if (res.ok) {
+          const loaded = await res.json();
+          const found = this.findNode(this.nodes, dir.path);
+          if (found) found.children = loaded;
+        }
+      } catch {}
     }
     this.requestUpdate();
+  }
+
+  private findNode(nodes: FileNode[], path: string): FileNode | null {
+    for (const n of nodes) {
+      if (n.path === path) return n;
+      if (n.children) {
+        const found = this.findNode(n.children, path);
+        if (found) return found;
+      }
+    }
+    return null;
   }
 
   select(node: FileNode, e: Event) {

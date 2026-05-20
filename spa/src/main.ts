@@ -3,6 +3,11 @@ import { html, render } from "lit";
 import { setAppStorage } from "@earendil-works/pi-web-ui";
 import "./pages/session-list";
 import "./pages/session-chat";
+import "./components/file-tree";
+import "./components/file-upload";
+import "./components/file-context-menu";
+import "./components/slash-commands";
+import "./components/session-stats";
 
 // Initialize minimal AppStorage mock for web mode.
 // The pi-web-ui ChatPanel calls ti() internally which requires AppStorage.

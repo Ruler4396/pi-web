@@ -200,9 +200,11 @@ pi-chat-panel {
   color: var(--text-weaker);
 }
 .welcome-inner .logo {
+  display: flex;
+  justify-content: center;
   margin-bottom: 12px;
   opacity: 0.35;
-  color: var(--text-weak);
+  color: var(--text-weak, #8f8f8f);
 }
 .welcome-inner .title {
   font-size: 18px;
@@ -223,6 +225,23 @@ pi-chat-panel {
   align-items: center;
   justify-content: space-between;
   background: var(--bg-strong);
+}
+
+/* Message editor refinement */
+message-editor textarea {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+message-editor textarea::placeholder {
+  color: var(--text-weaker, #b0b0b0) !important;
+  opacity: 1;
+}
+message-editor .bg-card {
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04) !important;
+  transition: box-shadow 0.15s !important;
+}
+message-editor .bg-card:focus-within {
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.25), 0 2px 8px rgba(0,0,0,0.04) !important;
 }
 
 /* Dark mode */
