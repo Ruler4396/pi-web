@@ -127,15 +127,21 @@ impl SessionManager {
         {
             let path = entry.path().to_path_buf();
 
+            let sid = path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+            let active = self.agents.read().await.contains_key(&sid);
+            let cwd = if let Ok(content) = std::fs::read_to_string(&path) {
+                content.lines().next()
+                    .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
+                    .and_then(|v| v.get("cwd").and_then(|c| c.as_str().map(String::from)))
+            } else { None };
             sessions.push(SessionInfo {
-                id: path.file_stem()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("unknown")
-                    .to_string(),
+                id: sid,
                 file: path.display().to_string(),
-                active: self.agents.read().await.contains_key(
-                    path.file_stem().and_then(|s| s.to_str()).unwrap_or(""),
-                ),
+                active,
+                cwd,
             });
         }
 
@@ -154,6 +160,8 @@ pub struct SessionInfo {
     pub id: String,
     pub file: String,
     pub active: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
 }
 
 
