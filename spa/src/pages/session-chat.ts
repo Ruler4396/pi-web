@@ -207,6 +207,7 @@ export class SessionChat extends LitElement {
   async initChat() {
     this.agent = new HttpAgent(this.sessionId);
     this.chatPanel = new ChatPanel();
+    this.agent.chatPanel = this.chatPanel;
     this.chatPanel.style.display = "flex";
     this.chatPanel.style.flexDirection = "column";
     this.chatPanel.style.flex = "1";

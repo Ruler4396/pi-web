@@ -1,4 +1,39 @@
 @import "@earendil-works/pi-web-ui/app.css";
+/* === ChatPanel component styling === */
+.user-message-container {
+  background: #eff6ff;
+  color: #1e40af;
+  max-width: 80%;
+  word-break: break-word;
+  border-radius: 12px;
+  padding: 0.5rem 1rem;
+}
+assistant-message { display: block; }
+assistant-message .markdown-content p { margin: 0.25rem 0; }
+assistant-message .markdown-content pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  margin: 0.5rem 0;
+}
+assistant-message .markdown-content code {
+  background: #f1f5f9;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+}
+assistant-message .markdown-content pre code { background: none; padding: 0; }
+user-message, assistant-message { margin-bottom: 0.75rem; }
+button:not(.theme-btn):not(.toggle-sidebar):not(.btn-delete):not(.btn-archive):not(.btn-new):hover {
+  filter: brightness(0.95);
+}
+thinking-block { display: block; margin: 0.5rem 0; padding: 0.5rem 0.75rem; background: #f8fafc; border-left: 3px solid #94a3b8; border-radius: 0 6px 6px 0; font-size: 0.8125rem; color: #64748b; }
+tool-message { display: block; margin: 0.5rem 0; padding: 0.5rem 0.75rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.8125rem; }
+streaming-message-container { display: block; }
+
 
 *,
 *::before,
@@ -100,19 +135,141 @@ html { transition: background 0.3s, color 0.3s; }
 [data-theme="dark"] .loading-wrap, [data-theme="dark"] .error-wrap { background: #0f172a; color: #94a3b8; }
 [data-theme="dark"] .loading-wrap .hint { color: #64748b; }
 
-/* === ChatPanel Tailwind-class equivalents === */
+/* layout */
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
 .flex-row { flex-direction: row; }
+.inline-flex { display: inline-flex; }
+.hidden { display: none; }
+.relative { position: relative; }
 .h-full { height: 100%; }
 .w-full { width: 100%; }
-.overflow-hidden { overflow: hidden; }
-.overflow-y-auto { overflow-y: auto; }
 .flex-1 { flex: 1 1 0%; }
 .shrink-0 { flex-shrink: 0; }
-.relative { position: relative; }
-.hidden { display: none; }
-.inline-flex { display: inline-flex; }
+.overflow-hidden { overflow: hidden; }
+.overflow-y-auto { overflow-y: auto; }
+.overflow-x-auto { overflow-x: auto; }
+
+/* sizing */
+.max-w-3xl { max-width: 48rem; }
+.h-4 { height: 1rem; }
+.h-5 { height: 1.25rem; }
+.h-8 { height: 2rem; }
+
+/* margin */
+.mx-auto { margin-left: auto; margin-right: auto; }
+.mt-2 { margin-top: 0.5rem; }
+.mt-3 { margin-top: 0.75rem; }
+.mx-4 { margin-left: 1rem; margin-right: 1rem; }
+.ml-auto { margin-left: auto; }
+.ml-1 { margin-left: 0.25rem; }
+
+/* padding */
+.p-4 { padding: 1rem; }
+.p-3 { padding: 0.75rem; }
+.pb-0 { padding-bottom: 0; }
+.pb-2 { padding-bottom: 0.5rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+
+/* gap */
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-3 { gap: 0.75rem; }
+
+/* typography */
+.text-xs { font-size: 0.75rem; }
+.text-sm { font-size: 0.875rem; }
+.font-medium { font-weight: 500; }
+.whitespace-nowrap { white-space: nowrap; }
+.break-words { word-wrap: break-word; overflow-wrap: anywhere; }
+
+/* background */
+.bg-background { background: #fff; }
+.bg-card { background: #fff; }
+.bg-transparent { background: transparent; }
+
+/* text colors */
+.text-foreground { color: #111; }
+.text-muted-foreground { color: #64748b; }
+.text-destructive { color: #dc2626; }
+.text-card-foreground { color: #111; }
+.hover\:text-accent-foreground:hover { color: #1d4ed8; }
+
+/* border */
+.rounded-xl { border-radius: 0.75rem; }
+.rounded-lg { border-radius: 0.5rem; }
+.rounded-md { border-radius: 0.375rem; }
+.border { border: 1px solid #e2e8f0; }
+.border-b { border-bottom: 1px solid #e2e8f0; }
+.border-l { border-left: 1px solid #e2e8f0; }
+.border-border { border-color: #e2e8f0; }
+
+/* shadow */
+.shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.shadow-xl { box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1); }
+
+/* flex alignment */
+.items-center { align-items: center; }
+.justify-start { justify-content: flex-start; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; }
+.justify-end { justify-content: flex-end; }
+
+/* interactivity */
+.cursor-pointer { cursor: pointer; }
+.outline-none { outline: 2px solid transparent; outline-offset: 2px; }
+.resize-none { resize: none; }
+.transition-all { transition: all 0.15s ease; }
+.transition-colors { transition: color 0.15s ease, background-color 0.15s ease; }
+
+/* states */
+.disabled\:cursor-not-allowed:disabled { cursor: not-allowed; }
+.disabled\:opacity-50:disabled { opacity: 0.5; }
+.disabled\:pointer-events-none:disabled { pointer-events: none; }
+
+/* hover/focus */
+.hover\:bg-accent:hover { background: #f1f5f9; }
+.focus-visible\:border-ring:focus-visible { border-color: #3b82f6; }
+.focus-visible\:ring-\[3px\]:focus-visible { outline: 3px solid rgba(59,130,246,0.5); }
+
+/* placeholder */
+.placeholder-muted-foreground::placeholder { color: #94a3b8; }
+
+/* destructive variants */
+.bg-destructive\/10 { background: rgba(220,38,38,0.1); }
+.aria-invalid\:border-destructive[aria-invalid] { border-color: #dc2626; }
+
+/* svg helpers */
+svg.pointer-events-none, [class*="pointer-events-none"] svg { pointer-events: none; }
+
+/* ChatPanel specific */
+.user-message-container {
+  background: #eff6ff;
+  color: #1e40af;
+  max-width: 80%;
+  word-break: break-word;
+}
+.assistant-message { display: block; }
+.assistant-message .markdown-content p { margin: 0.25rem 0; }
+.assistant-message .markdown-content pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+}
+.assistant-message .markdown-content code {
+  background: #f1f5f9;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-size: 0.8125rem;
+}
+.assistant-message .markdown-content pre code { background: none; padding: 0; }
 
 /* spacing */
 .max-w-3xl { max-width: 48rem; }
@@ -188,3 +345,5 @@ html { transition: background 0.3s, color 0.3s; }
 .markdown-content pre { background: #1e293b; color: #e2e8f0; padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.8125rem; }
 .markdown-content code { background: #f1f5f9; padding: 0.125rem 0.25rem; border-radius: 0.25rem; font-size: 0.8125rem; }
 .markdown-content pre code { background: none; padding: 0; }
+
+/* Show ChatPanel streaming container (ChatPanel renders content here during streaming) */
