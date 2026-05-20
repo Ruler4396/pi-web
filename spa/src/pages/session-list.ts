@@ -184,6 +184,28 @@ export class SessionList extends LitElement {
       border: 1px solid #fecaca;
     }
 
+    .btn-archive {
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.12s;
+      opacity: 0;
+    }
+    .session-card:hover .btn-archive { opacity: 1; }
+    .btn-archive:hover {
+      background: #eff6ff;
+      color: #1d4ed8;
+    }
+
     .btn-delete {
       width: 28px;
       height: 28px;
@@ -243,6 +265,14 @@ export class SessionList extends LitElement {
     } catch {}
   }
 
+  async archiveSession(id: string, e: Event) {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/session/${id}/archive`, { method: "POST" });
+      this.sessions = this.sessions.filter(s => s.id !== id);
+    } catch {}
+  }
+
   async createSession() {
     this.error = "";
     try {
@@ -297,6 +327,9 @@ export class SessionList extends LitElement {
                       <span class="session-status ${s.active ? 'status-active' : 'status-idle'}">
                         ${s.active ? "Active" : "Idle"}
                       </span>
+                      <button class="btn-archive" @click=${(e: Event) => this.archiveSession(s.id, e)} title="Archive session">
+                        ⬇
+                      </button>
                       <button class="btn-delete" @click=${(e: Event) => this.deleteSession(s.id, e)} title="Delete session">
                         ✕
                       </button>

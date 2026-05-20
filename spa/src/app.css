@@ -75,3 +75,28 @@ pi-chat-panel {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Dark mode theme */
+html { transition: background 0.3s, color 0.3s; }
+
+[data-theme="dark"] body { background: #0f172a; color: #e2e8f0; }
+[data-theme="dark"] .topbar { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .topbar .back { color: #94a3b8; }
+[data-theme="dark"] .topbar .back:hover { color: #60a5fa; background: #1e3a5f; }
+[data-theme="dark"] .sidebar { background: #1e293b; border-color: #334155; }
+[data-theme="dark"] .sidebar-header { border-color: #334155; color: #94a3b8; }
+[data-theme="dark"] .tree-node:hover { background: #1e3a5f; }
+[data-theme="dark"] .tree-node.selected { background: #1e3a5f; color: #60a5fa; }
+[data-theme="dark"] .resize-handle:hover, [data-theme="dark"] .resize-handle.active { background: #60a5fa; }
+[data-theme="dark"] .upload-btn { background: #1e293b; border-color: #334155; color: #94a3b8; }
+[data-theme="dark"] .upload-btn:hover { border-color: #60a5fa; color: #60a5fa; }
+[data-theme="dark"] .toggle-sidebar { color: #94a3b8; }
+[data-theme="dark"] .toggle-sidebar:hover { color: #60a5fa; background: #1e3a5f; }
+[data-theme="dark"] .cwd { color: #94a3b8; }
+[data-theme="dark"] .cwd:hover { color: #60a5fa; background: #1e3a5f; }
+[data-theme="dark"] .sid { color: #64748b; }
+[data-theme="dark"] .divider { color: #475569; }
+[data-theme="dark"] .stats-bar { background: #1e293b; border-color: #334155; color: #94a3b8; }
+[data-theme="dark"] .welcome-overlay { background: rgba(15,23,42,0.94) !important; }
+[data-theme="dark"] .loading-wrap, [data-theme="dark"] .error-wrap { background: #0f172a; color: #94a3b8; }
+[data-theme="dark"] .loading-wrap .hint { color: #64748b; }
