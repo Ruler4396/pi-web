@@ -310,20 +310,42 @@ file-tree {
 .loading-text, .empty-text { padding: 8px; color: var(--text-weaker, #b0b0b0); font-size: 12px; }
 
 /* Model selector inside message-editor */
-message-editor button[class*="inline-flex"] {
-  transition: background 0.1s, color 0.1s !important;
+message-editor .bg-card > div:last-child {
+  padding: 4px 12px 8px !important;
 }
-message-editor button[class*="inline-flex"]:hover {
-  background: rgba(0,0,0,0.04) !important;
-  color: var(--text-strong, #171717) !important;
-}
-/* Send button */
-message-editor button[class*="inline-flex"]:has(svg) {
+/* All buttons in the button row */
+message-editor .bg-card > div:last-child button {
   color: var(--text-weak, #8f8f8f) !important;
+  background: transparent !important;
+  border-radius: 5px !important;
 }
-message-editor button[class*="inline-flex"]:has(svg):hover {
+message-editor .bg-card > div:last-child button:hover {
+  color: var(--text-strong, #171717) !important;
+  background: rgba(0,0,0,0.04) !important;
+}
+/* Model name button - make it look like a chip */
+message-editor .bg-card > div:last-child button:not([class*="size-8"]) {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  padding: 3px 10px !important;
+  height: auto !important;
+  border-radius: 5px !important;
+  gap: 4px !important;
+}
+/* Send button - rightmost icon-only button */
+message-editor .bg-card > div:last-child > div:last-child button {
+  color: rgba(0,0,0,0.2) !important;
+}
+message-editor .bg-card > div:last-child > div:last-child button:hover {
   color: #2563eb !important;
-  background: rgba(37,99,235,0.06) !important;
+  background: rgba(37,99,235,0.08) !important;
+}
+/* Attachment button */
+message-editor .bg-card > div:last-child > div:first-child button {
+  opacity: 0.7;
+}
+message-editor .bg-card > div:last-child > div:first-child button:hover {
+  opacity: 1;
 }
 
 /* Dark mode */
