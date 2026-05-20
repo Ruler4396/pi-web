@@ -11,73 +11,37 @@ export class SessionChat extends LitElement {
   @state() private ready = false;
   @state() private error = "";
   @state() private theme: "dark" | "" = "";
+  @state() private previewPath = "";
+  @state() private previewContent = "";
+  @state() private previewLoading = false;
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
 
   static styles = css`
     .loading-wrap {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      color: var(--text-weak, #8f8f8f);
-      font-size: var(--font-size-base, 14px);
-      background: var(--bg-base, #f8f8f8);
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 12px; color: var(--text-weak, #8f8f8f);
+      font-size: var(--font-size-base, 14px); background: var(--bg-base, #f8f8f8);
     }
-    .loading-wrap .hint {
-      font-size: var(--font-size-sm, 13px);
-      color: var(--text-weaker, #b0b0b0);
-    }
+    .loading-wrap .hint { font-size: var(--font-size-sm, 13px); color: var(--text-weaker, #b0b0b0); }
     .error-wrap {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      background: var(--bg-base, #f8f8f8);
-      text-align: center;
-      padding: 32px;
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 10px; background: var(--bg-base, #f8f8f8);
+      text-align: center; padding: 32px;
     }
-    .error-wrap .err-icon {
-      font-size: 24px;
-      margin-bottom: 4px;
-    }
-    .error-wrap .err-msg {
-      color: #b91c1c;
-      font-size: var(--font-size-base, 14px);
-      font-weight: 500;
-    }
+    .error-wrap .err-icon { font-size: 24px; margin-bottom: 4px; }
+    .error-wrap .err-msg { color: #b91c1c; font-size: var(--font-size-base, 14px); font-weight: 500; }
     .error-wrap button {
-      margin-top: 8px;
-      padding: 6px 18px;
-      background: #2563eb;
-      color: #fff;
-      border: none;
-      border-radius: var(--radius-md, 6px);
-      cursor: pointer;
-      font-size: var(--font-size-sm, 13px);
-      font-weight: 500;
-      transition: background 0.12s;
+      margin-top: 8px; padding: 6px 18px; background: #2563eb; color: #fff;
+      border: none; border-radius: var(--radius-md, 6px); cursor: pointer;
+      font-size: var(--font-size-sm, 13px); font-weight: 500; transition: background 0.12s;
     }
-    .error-wrap button:hover {
-      background: #1d4ed8;
-    }
-
-    .theme-btn svg {
-      display: block;
-    }
-    .back svg {
-      display: block;
-      flex-shrink: 0;
-    }
+    .error-wrap button:hover { background: #1d4ed8; }
+    .theme-btn svg { display: block; }
+    .back svg { display: block; flex-shrink: 0; }
   `;
 
-  createRenderRoot() {
-    return this;
-  }
+  createRenderRoot() { return this; }
 
   async connectedCallback() {
     super.connectedCallback();
@@ -99,6 +63,13 @@ export class SessionChat extends LitElement {
       this.error = e.message || "Failed to initialize chat";
     }
     this.requestUpdate();
+
+    this.addEventListener("file-select", ((e: CustomEvent) => {
+      const node = e.detail;
+      if (node && node.type === "file") {
+        this.openPreview(node.path, node.name);
+      }
+    }) as EventListener);
   }
 
   async initChat() {
@@ -128,6 +99,33 @@ export class SessionChat extends LitElement {
     localStorage.setItem(THEME_KEY, next);
   };
 
+  async openPreview(path: string, _name: string) {
+    this.previewPath = path;
+    this.previewContent = "";
+    this.previewLoading = true;
+    this.requestUpdate();
+    try {
+      const absPath = "/root/" + path;
+      const res = await fetch("/api/file/read?path=" + encodeURIComponent(absPath));
+      if (res.ok) {
+        const data = await res.json();
+        this.previewContent = data.content || "(empty)";
+      } else {
+        this.previewContent = "(failed to load)";
+      }
+    } catch {
+      this.previewContent = "(error loading file)";
+    }
+    this.previewLoading = false;
+    this.requestUpdate();
+  }
+
+  closePreview() {
+    this.previewPath = "";
+    this.previewContent = "";
+    this.requestUpdate();
+  }
+
   render() {
     if (this.error) {
       return html`
@@ -136,9 +134,7 @@ export class SessionChat extends LitElement {
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           </div>
           <div class="err-msg">${this.error}</div>
-          <button @click=${() => { this.error = ""; this.connectedCallback(); }}>
-            Retry
-          </button>
+          <button @click=${() => { this.error = ""; this.connectedCallback(); }}>Retry</button>
         </div>
       `;
     }
@@ -158,10 +154,7 @@ export class SessionChat extends LitElement {
     return html`
       <div class="chat-wrapper">
         <div class="topbar">
-          <a class="back" href="#" @click=${(e: Event) => {
-            e.preventDefault();
-            window.location.hash = "";
-          }}>
+          <a class="back" href="#" @click=${(e: Event) => { e.preventDefault(); window.location.hash = ""; }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
             Sessions
           </a>
@@ -181,6 +174,19 @@ export class SessionChat extends LitElement {
               <file-upload></file-upload>
             </div>
             <file-tree rootpath="/root" style="flex:1;overflow-y:auto;min-height:0;padding:4px 0"></file-tree>
+            ${this.previewPath ? html`
+              <div class="file-preview">
+                <div class="file-preview-header">
+                  <span>${this.previewPath}</span>
+                  <button class="close-btn" @click=${this.closePreview}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+                ${this.previewLoading
+                  ? html`<div class="file-preview-loading">Loading...</div>`
+                  : html`<div class="file-preview-content">${this.previewContent}</div>`}
+              </div>
+            ` : ""}
           </div>
           <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
             <div class="welcome">

@@ -311,7 +311,127 @@ file-tree {
 
 /* Model selector inside message-editor */
 message-editor .bg-card > div:last-child {
-  padding: 4px 12px 8px !important;
+  padding: 6px 12px 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 6px !important;
+}
+/* All buttons in the button row - always visible */
+message-editor .bg-card > div:last-child button {
+  color: var(--text-weak, #8f8f8f) !important;
+  background: transparent !important;
+  border-radius: 5px !important;
+  opacity: 0.7 !important;
+  transition: opacity 0.12s, background 0.12s, color 0.12s !important;
+}
+message-editor .bg-card > div:last-child button:hover {
+  opacity: 1 !important;
+  color: var(--text-strong, #171717) !important;
+  background: rgba(0,0,0,0.04) !important;
+}
+/* Model name button - chip style */
+message-editor .bg-card > div:last-child button:not([class*="size-8"]) {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  padding: 3px 10px !important;
+  height: 26px !important;
+  border-radius: 5px !important;
+  gap: 4px !important;
+  line-height: 1 !important;
+  color: var(--text-base, #6f6f6f) !important;
+  opacity: 0.8 !important;
+}
+/* Left side buttons group */
+message-editor .bg-card > div:last-child > div:first-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+/* Right side buttons group */
+message-editor .bg-card > div:last-child > div:last-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+/* Send button */
+message-editor .bg-card > div:last-child > div:last-child button {
+  opacity: 0.55 !important;
+  color: var(--text-weak, #8f8f8f) !important;
+}
+message-editor .bg-card > div:last-child > div:last-child button:hover {
+  opacity: 1 !important;
+  color: #2563eb !important;
+  background: rgba(37,99,235,0.08) !important;
+}
+/* Placeholder text */
+message-editor textarea::placeholder {
+  color: var(--text-weaker, #b0b0b0) !important;
+  font-size: 14px !important;
+  opacity: 1 !important;
+}
+message-editor textarea {
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  padding: 14px 16px !important;
+}
+/* Editor card */
+message-editor .bg-card {
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04) !important;
+  transition: box-shadow 0.15s !important;
+}
+message-editor .bg-card:focus-within {
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.25), 0 2px 8px rgba(0,0,0,0.04) !important;
+}
+
+/* File preview panel */
+.file-preview {
+  border-top: 0.5px solid rgba(0,0,0,0.07);
+  background: var(--bg-base, #f8f8f8);
+  max-height: 200px;
+  overflow: auto;
+  flex-shrink: 0;
+}
+.file-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--text-weak, #8f8f8f);
+  border-bottom: 0.5px solid rgba(0,0,0,0.05);
+}
+.file-preview-header .close-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text-weaker, #b0b0b0);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.file-preview-header .close-btn:hover {
+  background: rgba(0,0,0,0.06);
+  color: var(--text-strong, #171717);
+}
+.file-preview-content {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-base, #6f6f6f);
+  line-height: 1.5;
+}
+.file-preview-loading {
+  padding: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-weaker, #b0b0b0);
 }
 /* All buttons in the button row */
 message-editor .bg-card > div:last-child button {
