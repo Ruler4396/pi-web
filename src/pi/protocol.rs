@@ -161,6 +161,34 @@ pub enum AgentEvent {
         #[serde(rename = "errorHints")]
         error_hints: Option<String>,
     },
+    #[serde(rename = "wiki_result")]
+    WikiResult {
+        id: String,
+        query: String,
+        results: Value,
+        total: i64,
+    },
+    #[serde(rename = "memory_result")]
+    MemoryResult {
+        id: String,
+        query: String,
+        memories: Value,
+    },
+    #[serde(rename = "hermes_event")]
+    HermesEvent {
+        platform: String,
+        event: String,
+        #[serde(rename = "fromUser")]
+        from_user: String,
+        message: String,
+    },
+    #[serde(rename = "prompt_chain_event")]
+    PromptChainEvent {
+        #[serde(rename = "chainName")]
+        chain_name: String,
+        step: i64,
+        status: String,
+    },
     #[serde(other)]
     Unknown,
 }
