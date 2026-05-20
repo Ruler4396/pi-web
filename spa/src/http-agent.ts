@@ -54,10 +54,6 @@ export class HttpAgent {
 
     this._state.addMessage({ role: "user", content: [{ type: "text", text: messageText }] });
     this._state.isStreaming = true;
-    this.chatPanel?.agentInterface?.requestUpdate();
-    // Directly show streaming container
-    const sc = document.querySelector("streaming-message-container");
-    if (sc) sc.classList.remove("hidden");
     this._state.errorMessage = undefined;
 
     await this.emit({ type: "agent_start", sessionId: this.sessionId } as any);
@@ -113,21 +109,6 @@ export class HttpAgent {
                   stopReason: null,
                 };
                 this._state.addMessage(msg);
-                // Directly update DOM assistant message for reliability
-                try {
-                  const am = document.querySelector("assistant-message");
-                  if (am) {
-                    const markdownBlock = am.querySelector("markdown-block");
-                    if (markdownBlock) {
-                      (markdownBlock as any).content = currentAssistantContent;
-                    }
-                    // Also try setting message property if available
-                    if (typeof (am as any).message === "object") {
-                      (am as any).message = { ...(am as any).message, content: [{ type: "text", text: currentAssistantContent }] };
-                    }
-                    (am as any).requestUpdate?.();
-                  }
-                } catch {}
                 await this.emit({ type: "message_start", message: msg });
                 break;
               }
@@ -140,8 +121,6 @@ export class HttpAgent {
                     const lastMsg = this._state.messages[this._state.messages.length - 1] as any;
                     // Content must be an array of {type, text} chunks for ChatPanel
                     lastMsg.content = [{ type: "text", text: currentAssistantContent }];
-                  // Force array reference change so ChatPanel detects update
-                  this._state.messages = this._state.messages;
                   }
                 }
                 const updateMsg = this._state.messages[this._state.messages.length - 1] || { role: "assistant", content: [{ type: "text", text: currentAssistantContent }] };
@@ -211,10 +190,6 @@ export class HttpAgent {
       this._state.addMessage({ role: "assistant", content: [{ type: "text", text: `Error: ${err.message}` }], stopReason: "error", errorMessage: err.message });
     } finally {
       this._state.isStreaming = false;
-      this.chatPanel?.agentInterface?.requestUpdate();
-      // Hide streaming container
-      const sc2 = document.querySelector("streaming-message-container");
-      if (sc2) sc2.classList.add("hidden");
       this.abortController = null;
       if (!this._aborted) {
         await this.emit({ type: "agent_end", messages: [...this._state.messages] });
