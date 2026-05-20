@@ -9,6 +9,18 @@ interface FileNode {
   size?: number;
 }
 
+const folderSvg = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+const folderOpenSvg = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2.5L10 7h10a2 2 0 0 1 2 2v1"/></svg>`;
+const fileSvg = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+
+const extColors: Record<string, string> = {
+  ts: "#3178c6", tsx: "#3178c6", js: "#f0db4f", jsx: "#f0db4f",
+  py: "#3572a5", rs: "#dea584", go: "#00add8", rb: "#cc342d",
+  css: "#563d7c", html: "#e34c26", md: "#083fa1", json: "#292929",
+  yaml: "#cb171e", yml: "#cb171e", toml: "#9c4221", svg: "#ffb13b",
+  sh: "#4eaa25", bash: "#4eaa25", sql: "#dad8d8", dockerfile: "#0db7ed",
+};
+
 @customElement("file-tree")
 export class FileTree extends LitElement {
   @property() rootPath = "/root";
@@ -18,16 +30,18 @@ export class FileTree extends LitElement {
   @state() private loading = false;
 
   static styles = css`
-    :host { display: block; overflow-y: auto; font-size: 0.8125rem; user-select: none; }
-    .tree-node { display: flex; align-items: center; padding: 0.125rem 0.5rem; cursor: pointer; border-radius: 4px; gap: 0.25rem; white-space: nowrap; }
-    .tree-node:hover { background: #f1f5f9; }
-    .tree-node.selected { background: #dbeafe; color: #1d4ed8; }
-    .tree-node .icon { width: 16px; text-align: center; flex-shrink: 0; font-size: 0.75rem; }
-    .tree-node .name { overflow: hidden; text-overflow: ellipsis; }
-    .tree-node .size { margin-left: auto; color: #94a3b8; font-size: 0.6875rem; flex-shrink: 0; }
-    .children { padding-left: 1rem; }
-    .loading-text { padding: 0.5rem; color: #94a3b8; font-size: 0.75rem; }
-    .empty-text { padding: 0.5rem; color: #94a3b8; font-size: 0.75rem; }
+    :host { display: block; overflow-y: auto; font-size: 13px; user-select: none; }
+    .tree-node { display: flex; align-items: center; padding: 2px 8px; cursor: pointer; border-radius: 4px; gap: 6px; white-space: nowrap; color: var(--text-base, #6f6f6f); }
+    .tree-node:hover { background: rgba(0,0,0,0.04); }
+    .tree-node.selected { background: rgba(37,99,235,0.08); color: #2563eb; }
+    .icon { display: flex; align-items: center; flex-shrink: 0; width: 16px; height: 16px; color: var(--text-weak, #8f8f8f); }
+    .tree-node.selected .icon { color: #2563eb; }
+    .name { overflow: hidden; text-overflow: ellipsis; }
+    .ext-badge { font-size: 9px; font-weight: 600; padding: 0 3px; border-radius: 2px; flex-shrink: 0; line-height: 14px; opacity: 0.7; }
+    .size { margin-left: auto; color: var(--text-weaker, #b0b0b0); font-size: 11px; flex-shrink: 0; }
+    .children { padding-left: 16px; }
+    .loading-text { padding: 8px; color: var(--text-weaker, #b0b0b0); font-size: 12px; }
+    .empty-text { padding: 8px; color: var(--text-weaker, #b0b0b0); font-size: 12px; }
   `;
 
   createRenderRoot() { return this; }
@@ -57,7 +71,8 @@ export class FileTree extends LitElement {
     this.expanded.add(dir.path);
     if (dir.children === undefined || dir.children.length === 0) {
       try {
-        const res = await fetch("/api/file/list?path=" + encodeURIComponent(this.rootPath.replace(/\/+$/, "") + "/" + dir.path));
+        const absPath = this.rootPath.replace(/\/+$/, "") + "/" + dir.path;
+        const res = await fetch("/api/file/list?path=" + encodeURIComponent(absPath));
         if (res.ok) {
           const loaded = await res.json();
           const found = this.findNode(this.nodes, dir.path);
@@ -96,19 +111,11 @@ export class FileTree extends LitElement {
     }));
   }
 
-  private icon(node: FileNode) {
-    if (node.type === "directory") {
-      return this.expanded.has(node.path) ? "📂" : "📁";
-    }
-    const ext = node.name.split(".").pop()?.toLowerCase();
-    const icons: Record<string, string> = {
-      ts: "🟦", tsx: "⚛️", js: "🟨", jsx: "⚛️", py: "🐍", rs: "🦀",
-      go: "🔵", java: "☕", rb: "💎", php: "🐘", css: "🎨", html: "🌐",
-      md: "📝", json: "📋", yaml: "⚙️", yml: "⚙️", toml: "⚙️", lock: "🔒",
-      gitignore: "🙈", env: "🔑", svg: "🖼️", png: "🖼️", jpg: "🖼️",
-      pdf: "📕", zip: "📦", tar: "📦", gz: "📦", sh: "💻", bash: "💻",
-    };
-    return icons[ext || ""] || "📄";
+  private extBadge(name: string) {
+    const ext = name.split(".").pop()?.toLowerCase() || "";
+    if (!ext || ext === name) return html``;
+    const color = extColors[ext] || "#6f6f6f";
+    return html`<span class="ext-badge" style="background:${color}15;color:${color}">${ext}</span>`;
   }
 
   private formatSize(bytes: number): string {
@@ -120,12 +127,14 @@ export class FileTree extends LitElement {
   renderNode(node: FileNode) {
     const isExpanded = this.expanded.has(node.path);
     const isSelected = this.selected === node.path;
+    const isDir = node.type === "directory";
     return html`
-      <div class="tree-node ${isSelected ? 'selected' : ''}"
+      <div class="tree-node ${isSelected ? "selected" : ""}"
            @click=${(e: Event) => this.select(node, e)}
            @contextmenu=${(e: MouseEvent) => this.contextMenu(node, e)}>
-        <span class="icon">${this.icon(node)}</span>
+        <span class="icon">${isDir ? (isExpanded ? folderOpenSvg : folderSvg) : fileSvg}</span>
         <span class="name">${node.name}</span>
+        ${isDir ? "" : this.extBadge(node.name)}
         ${node.size ? html`<span class="size">${this.formatSize(node.size)}</span>` : ""}
       </div>
       ${node.children && isExpanded ? html`
