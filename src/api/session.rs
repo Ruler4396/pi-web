@@ -10,9 +10,24 @@ pub async fn list(State(state): State<AppState>) -> Result<Json<serde_json::Valu
     Ok(Json(serde_json::to_value(sessions).unwrap()))
 }
 
-pub async fn create(State(state): State<AppState>) -> Result<Json<serde_json::Value>, StatusCode> {
+pub async fn create(
+    State(state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
     let id = uuid::Uuid::new_v4().to_string();
     let agent = state.sessions.get_or_create(&id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if let Some(cwd) = body.get("cwd").and_then(|v| v.as_str()) {
+        let session_file = state.sessions.session_path(&id);
+        if let Ok(content) = tokio::fs::read_to_string(&session_file).await {
+            if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&content) {
+                json["cwd"] = serde_json::Value::String(cwd.to_string());
+                if let Ok(new_content) = serde_json::to_string(&json) {
+                    let _ = tokio::fs::write(&session_file, new_content + "
+").await;
+                }
+            }
+        }
+    }
     let _ = state.session_events.send(SessionEvent {
         event: "session_created".into(),
         session_id: id.clone(),
