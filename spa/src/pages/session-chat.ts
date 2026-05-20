@@ -14,31 +14,26 @@ export class SessionChat extends LitElement {
   @state() private previewPath = "";
   @state() private previewContent = "";
   @state() private previewLoading = false;
+  @state() private sessionCwd = "/root";
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
 
   static styles = css`
     .loading-wrap {
       flex: 1; display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 12px; color: var(--text-weak, #8f8f8f);
-      font-size: var(--font-size-base, 14px); background: var(--bg-base, #f8f8f8);
+      justify-content: center; gap: 12px; color: var(--text-weak); font-size: 14px;
+      background: var(--bg-base);
     }
-    .loading-wrap .hint { font-size: var(--font-size-sm, 13px); color: var(--text-weaker, #b0b0b0); }
+    .loading-wrap .hint { font-size: 13px; color: var(--text-weaker); }
     .error-wrap {
       flex: 1; display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 10px; background: var(--bg-base, #f8f8f8);
+      justify-content: center; gap: 10px; background: var(--bg-base);
       text-align: center; padding: 32px;
     }
-    .error-wrap .err-icon { font-size: 24px; margin-bottom: 4px; }
-    .error-wrap .err-msg { color: #b91c1c; font-size: var(--font-size-base, 14px); font-weight: 500; }
-    .error-wrap button {
-      margin-top: 8px; padding: 6px 18px; background: #2563eb; color: #fff;
-      border: none; border-radius: var(--radius-md, 6px); cursor: pointer;
-      font-size: var(--font-size-sm, 13px); font-weight: 500; transition: background 0.12s;
-    }
+    .error-wrap .err-msg { color: #b91c1c; font-size: 14px; font-weight: 500; }
+    .error-wrap button { margin-top: 8px; padding: 6px 18px; background: var(--accent); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
     .error-wrap button:hover { background: #1d4ed8; }
-    .theme-btn svg { display: block; }
-    .back svg { display: block; flex-shrink: 0; }
+    .theme-btn svg, .back svg { display: block; flex-shrink: 0; }
   `;
 
   createRenderRoot() { return this; }
@@ -67,7 +62,7 @@ export class SessionChat extends LitElement {
     this.addEventListener("file-select", ((e: CustomEvent) => {
       const node = e.detail;
       if (node && node.type === "file") {
-        this.openPreview(node.path, node.name);
+        this.openPreview(node.path);
       }
     }) as EventListener);
   }
@@ -84,6 +79,17 @@ export class SessionChat extends LitElement {
       onBeforeSend: () => {},
       onApiKeyRequired: async () => true,
     });
+
+    // Load session cwd for file tree
+    try {
+      const res = await fetch("/api/session");
+      if (res.ok) {
+        const sessions = await res.json();
+        const s = sessions.find((s: any) => s.id === this.sessionId);
+        if (s && s.cwd) this.sessionCwd = s.cwd;
+      }
+    } catch {}
+    this.requestUpdate();
   }
 
   disconnectedCallback() {
@@ -99,13 +105,13 @@ export class SessionChat extends LitElement {
     localStorage.setItem(THEME_KEY, next);
   };
 
-  async openPreview(path: string, _name: string) {
-    this.previewPath = path;
+  async openPreview(relPath: string) {
+    this.previewPath = relPath;
     this.previewContent = "";
     this.previewLoading = true;
     this.requestUpdate();
     try {
-      const absPath = "/root/" + path;
+      const absPath = this.sessionCwd.replace(/\/+$/, "") + "/" + relPath;
       const res = await fetch("/api/file/read?path=" + encodeURIComponent(absPath));
       if (res.ok) {
         const data = await res.json();
@@ -173,32 +179,36 @@ export class SessionChat extends LitElement {
               <span style="font-size:12px;font-weight:500;color:var(--text-weak,#8f8f8f);letter-spacing:0.04em">FILES</span>
               <file-upload></file-upload>
             </div>
-            <file-tree rootpath="/root" style="flex:1;overflow-y:auto;min-height:0;padding:4px 0"></file-tree>
+            <file-tree rootpath=${this.sessionCwd} style="flex:1;overflow-y:auto;min-height:0;padding:4px 0"></file-tree>
+          </div>
+          <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
             ${this.previewPath ? html`
-              <div class="file-preview">
-                <div class="file-preview-header">
+              <div class="preview-panel" style="max-height:35%">
+                <div class="preview-header">
                   <span>${this.previewPath}</span>
                   <button class="close-btn" @click=${this.closePreview}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   </button>
                 </div>
-                ${this.previewLoading
-                  ? html`<div class="file-preview-loading">Loading...</div>`
-                  : html`<div class="file-preview-content">${this.previewContent}</div>`}
+                <div class="preview-body">
+                  ${this.previewLoading
+                    ? html`<div class="preview-loading">Loading...</div>`
+                    : html`<pre>${this.previewContent}</pre>`}
+                </div>
               </div>
             ` : ""}
-          </div>
-          <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
-            <div class="welcome">
-              <div class="welcome-inner">
-                <div class="logo">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
+              <div class="welcome">
+                <div class="welcome-inner">
+                  <div class="logo">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  </div>
+                  <div class="title">What can I help with?</div>
+                  <div class="subtitle">Type a message below to start a conversation</div>
                 </div>
-                <div class="title">What can I help with?</div>
-                <div class="subtitle">Type a message below to start a conversation</div>
               </div>
+              ${this.chatPanel}
             </div>
-            ${this.chatPanel}
           </div>
         </div>
       </div>
