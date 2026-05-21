@@ -3,44 +3,42 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use rust_embed::RustEmbed;
+use std::path::PathBuf;
 
-#[derive(RustEmbed)]
-#[folder = "spa/dist/"]
-pub struct SpaAssets;
+const SPA_DIST: &str = "spa/dist";
 
 pub async fn spa_fallback(uri: axum::http::Uri) -> Response {
     let path = uri.path().trim_start_matches('/');
+    let base = PathBuf::from(SPA_DIST);
 
-    let file: Option<rust_embed::EmbeddedFile> = if path.is_empty() {
-        SpaAssets::get("index.html")
+    let file_path = if path.is_empty() {
+        base.join("index.html")
     } else {
-        SpaAssets::get(path)
+        base.join(path)
     };
 
-    match file {
-        Some(content) => {
-            let mime = mime_guess(path);
+    match tokio::fs::read(&file_path).await {
+        Ok(content) => {
+            let mime = mime_guess(file_path.to_str().unwrap_or(""));
             Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, mime)
-                .body(axum::body::Body::from(content.data))
+                .body(axum::body::Body::from(content))
                 .unwrap()
         }
-        None => SpaAssets::get("index.html")
-            .map(|content| {
-                Response::builder()
+        Err(_) => {
+            match tokio::fs::read(base.join("index.html")).await {
+                Ok(content) => Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "text/html")
-                    .body(axum::body::Body::from(content.data))
-                    .unwrap()
-            })
-            .unwrap_or_else(|| {
-                Response::builder()
+                    .body(axum::body::Body::from(content))
+                    .unwrap(),
+                Err(_) => Response::builder()
                     .status(StatusCode::NOT_FOUND)
                     .body(axum::body::Body::from("Not Found"))
-                    .unwrap()
-            }),
+                    .unwrap(),
+            }
+        }
     }
 }
 

@@ -530,7 +530,57 @@ export class SessionChat extends LitElement {
               : html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`}
           </button>
         </div>
-
+        ${this.showAddModelDialog ? html`
+          <div class="modal-overlay" @click=${this.closeAddModel}></div>
+          <div class="model-dialog">
+            <div class="model-dialog-header">
+              <span>Add Model</span>
+              <button class="model-dialog-close" @click=${this.closeAddModel}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="model-dialog-body">
+              <div class="model-dialog-row">
+                <div class="model-dialog-field">
+                  <label>Provider ID</label>
+                  <input type="text" placeholder="e.g. openai" .value=${this.addModelForm.provider} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, provider: (e.target as HTMLInputElement).value }; }}>
+                </div>
+                <div class="model-dialog-field">
+                  <label>Model ID</label>
+                  <input type="text" placeholder="e.g. gpt-4o" .value=${this.addModelForm.id} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, id: (e.target as HTMLInputElement).value }; }}>
+                </div>
+              </div>
+              <div class="model-dialog-row">
+                <div class="model-dialog-field">
+                  <label>Display Name</label>
+                  <input type="text" placeholder="e.g. GPT-4o" .value=${this.addModelForm.label} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, label: (e.target as HTMLInputElement).value }; }}>
+                </div>
+              </div>
+              <div class="model-dialog-row">
+                <div class="model-dialog-field" style="flex:1">
+                  <label>API Key <span style="color:var(--text-weaker);font-weight:400">(optional)</span></label>
+                  <input type="password" placeholder="sk-..." .value=${this.addModelForm.apiKey} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, apiKey: (e.target as HTMLInputElement).value }; }}>
+                </div>
+              </div>
+              <div class="model-dialog-row">
+                <div class="model-dialog-field" style="flex:1">
+                  <label>Base URL <span style="color:var(--text-weaker);font-weight:400">(optional)</span></label>
+                  <input type="text" placeholder="https://api.openai.com/v1" .value=${this.addModelForm.baseUrl} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, baseUrl: (e.target as HTMLInputElement).value }; }}>
+                </div>
+              </div>
+              <div class="model-dialog-row">
+                <label class="model-dialog-checkbox">
+                  <input type="checkbox" .checked=${this.addModelForm.thinking} @change=${(e: Event) => { this.addModelForm = { ...this.addModelForm, thinking: (e.target as HTMLInputElement).checked }; }}>
+                  <span>Thinking / Reasoning support</span>
+                </label>
+              </div>
+            </div>
+            <div class="model-dialog-footer">
+              <button class="model-dialog-cancel" @click=${this.closeAddModel}>Cancel</button>
+              <button class="model-dialog-submit" @click=${this.submitAddModel} ?disabled=${!this.addModelForm.provider || !this.addModelForm.id || !this.addModelForm.label}>Add Model</button>
+            </div>
+          </div>
+        ` : ""}
         <div class="main-row" style="flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden">
           <!-- Sidebar -->
           <div class="sidebar" style="width:260px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-base);border-right:0.5px solid rgba(255,255,255,0.07);flex-shrink:0;position:relative">
