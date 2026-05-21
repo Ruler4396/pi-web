@@ -546,3 +546,21 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 
 [data-theme= dark] .shortcuts-panel { background: #1e1e1e; }
 [data-theme=dark] .shortcut-row kbd { background: #2a2a2a; border-color: rgba(255,255,255,0.08); }
+
+/* Context bar */
+.context-bar {
+  position: relative; height: 18px; flex-shrink: 0;
+  background: var(--bg-weak); overflow: hidden;
+  display: flex; align-items: center;
+}
+.context-bar-fill {
+  position: absolute; left: 0; top: 0; bottom: 0;
+  background: linear-gradient(90deg, rgba(37,99,235,0.06), rgba(37,99,235,0.12));
+  transition: width 0.3s; border-right: 1px solid rgba(37,99,235,0.2);
+}
+.context-bar-text {
+  position: relative; z-index: 1; padding: 0 8px;
+  font-size: 10px; color: var(--text-weaker);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.context-bar-text:hover { color: var(--text-weak); }

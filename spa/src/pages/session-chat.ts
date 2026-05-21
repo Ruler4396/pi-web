@@ -41,9 +41,9 @@ export class SessionChat extends LitElement {
   }
   @state() showAddModelDialog = false;
   @state() showSettings = false;
-  @state() showShortcuts = false;
+  @state() showShortcuts = false; contextTokens = 0; contextMax = 65536;
   @state() apiKeys: Record<string, string> = {};
-  _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null;
+  _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
   @state() addModelForm = { provider: "", id: "", label: "", apiKey: "", baseUrl: "", thinking: false };
   @state() private terminalContent = "";
@@ -745,6 +745,10 @@ export class SessionChat extends LitElement {
                 </div>
               </div>
             ` : ""}
+            <div class="context-bar">
+              <div class="context-bar-fill" style="width:${Math.min(100, this.contextTokens / this.contextMax * 100)}%"></div>
+              <span class="context-bar-text">${this.contextTokens.toLocaleString()} / ${(this.contextMax/1000).toFixed(0)}k</span>
+            </div>
             ${this.chatPanel}
           </div>
         </div>
