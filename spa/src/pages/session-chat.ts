@@ -32,6 +32,7 @@ export class SessionChat extends LitElement {
   @state() private hasMessages = false;
   @state() private showTerminal = false;
   @state() private terminalContent = "";
+  @state() private terminalCwd = "/root";
   @state() private tabs: FileTab[] = [];
   @state() private activeTab = 0;
   @state() tabPanelWidth = 42;
@@ -100,7 +101,7 @@ export class SessionChat extends LitElement {
       if (res.ok) {
         const sessions = await res.json();
         const s = sessions.find((s: any) => s.id === this.sessionId);
-        if (s?.cwd) this.sessionCwd = s.cwd;
+        if (s?.cwd) { this.sessionCwd = s.cwd; this.terminalCwd = s.cwd; }
       }
     } catch {}
     this.msgInterval = window.setInterval(() => {
@@ -178,36 +179,99 @@ export class SessionChat extends LitElement {
   };
 
   // Global drag-drop for file tree
+  private dragExpandTimer = 0;
   private onGlobalDragOver = (e: DragEvent) => {
     e.preventDefault();
     const sidebar = this.querySelector(".sidebar");
     if (sidebar && sidebar.contains(e.target as Node)) {
-      this.dragCounter++;
       this.fileTreeDragging = true; this.requestUpdate();
+      // Auto-expand directory on hover
+      const target = document.elementFromPoint(e.clientX, e.clientY);
+      if (target) {
+        const treeNode = target.closest(".tree-node");
+        if (treeNode) {
+          const icon = treeNode.querySelector(".icon svg");
+          const isFolder = icon && icon.outerHTML.includes("M22 19a2 2 0 0 1-2 2H4");
+          if (isFolder) {
+            clearTimeout(this.dragExpandTimer);
+            this.dragExpandTimer = window.setTimeout(() => {
+              const nodeName = treeNode.querySelector(".name")?.textContent?.trim();
+              if (nodeName) {
+                // Find the ft-drop-overlay path - try to expand via the file-tree
+                const ft = this.querySelector("file-tree") as any;
+                if (ft && ft.expanded) {
+                  const relPath = nodeName;
+                  if (!ft.expanded.has(relPath)) {
+                    // Trigger toggle by dispatching a click
+                    treeNode.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+                  }
+                }
+              }
+            }, 600);
+          }
+        }
+      }
     }
   };
   private onGlobalDragLeave = (e: DragEvent) => {
     const sidebar = this.querySelector(".sidebar");
-    if (sidebar && sidebar.contains(e.target as Node)) {
-      this.dragCounter--;
-      if (this.dragCounter <= 0) { this.fileTreeDragging = false; this.dragCounter = 0; this.requestUpdate(); }
+    if (sidebar && !sidebar.contains(e.relatedTarget as Node)) {
+      this.fileTreeDragging = false; this.requestUpdate();
     }
+    clearTimeout(this.dragExpandTimer);
   };
   private onGlobalDrop = (e: DragEvent) => {
     e.preventDefault();
-    this.fileTreeDragging = false; this.dragCounter = 0; this.requestUpdate();
-    if (e.dataTransfer?.files) this.dispatchEvent(new CustomEvent("file-drop", { detail: { files: e.dataTransfer.files }, bubbles: true, composed: true }));
+    this.fileTreeDragging = false; this.requestUpdate();
+    clearTimeout(this.dragExpandTimer);
+    // Determine drop target directory
+    const target = document.elementFromPoint(e.clientX, e.clientY);
+    let dropCwd = this.sessionCwd;
+    if (target) {
+      const treeNode = target.closest(".tree-node");
+      if (treeNode) {
+        const name = treeNode.querySelector(".name")?.textContent?.trim();
+        const icon = treeNode.querySelector(".icon svg");
+        const isFolder = icon && icon.outerHTML.includes("M22 19a2 2 0 0 1-2 2H4");
+        // If dropped on a folder, use that folder as target; if on file, use parent
+        dropCwd = this.sessionCwd + "/" + (isFolder ? name : "");
+      }
+    }
+    if (e.dataTransfer?.files) {
+      this.dispatchEvent(new CustomEvent("file-drop", {
+        detail: { files: e.dataTransfer.files, cwd: dropCwd },
+        bubbles: true, composed: true,
+      }));
+    }
   };
 
   async runTerminalCommand(cmd: string, input: HTMLTextAreaElement) {
-    this.terminalContent += "$ " + cmd + "\n";
+    this.terminalContent += this.terminalCwd + " $ " + cmd + "\n";
     input.value = "";
     this.requestUpdate();
+    // Handle cd locally
+    const cdMatch = cmd.trim().match(/^cd\s+(.+)$/);
+    if (cdMatch) {
+      const target = cdMatch[1].trim();
+      let newCwd = target.startsWith("/") ? target : this.terminalCwd.replace(/\/+$/, "") + "/" + target;
+      // Normalize path
+      const parts = newCwd.split("/").filter(function(p) { return p && p !== "."; });
+      const resolved = [];
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i] === "..") { if (resolved.length > 0) resolved.pop(); }
+        else { resolved.push(parts[i]); }
+      }
+      newCwd = "/" + resolved.join("/");
+      this.terminalCwd = newCwd || "/";
+      this.terminalContent += "(changed to " + this.terminalCwd + ")\n";
+      this.requestUpdate();
+      return;
+    }
     try {
       const res = await fetch("/api/shell/exec", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: cmd, cwd: this.sessionCwd }),
+        body: JSON.stringify({ command: cmd, cwd: this.terminalCwd }),
       });
       if (res.ok) {
         const data = await res.json();

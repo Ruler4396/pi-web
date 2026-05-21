@@ -88,8 +88,14 @@ export class SessionList extends LitElement {
 
   onSelect?: (id: string) => void;
 
+  createRenderRoot() { return this; }
+
   connectedCallback() {
     super.connectedCallback();
+    const saved = localStorage.getItem("pi-theme");
+    if (!saved || saved === "dark") {
+      document.documentElement.dataset.theme = "dark";
+    }
     this.loadSessions();
   }
 
