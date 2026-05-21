@@ -98,12 +98,13 @@ file-upload .upload-btn:hover {
   border-color: rgba(37,99,235,0.3) !important;
 }
 file-upload .upload-btn.uploading { opacity: 0.4 !important; pointer-events: none !important; }
-file-upload .drag-overlay.active {
-  display: flex !important; position: fixed !important; inset: 0 !important;
-  background: rgba(37,99,235,0.04) !important; border: 2px dashed rgba(37,99,235,0.4) !important;
-  z-index: 9998 !important; align-items: center !important; justify-content: center !important;
-  font-size: 16px !important; color: #2563eb !important; font-weight: 500 !important;
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+file-upload .drag-overlay {
+  position: fixed; inset: 0; z-index: 9998;
+  background: rgba(37,99,235,0.04); border: 2px dashed rgba(37,99,235,0.4);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: #2563eb; font-weight: 500;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  pointer-events: none;
 }
 
 /* ===== File tree (global — light DOM compatibility) ===== */
@@ -174,6 +175,7 @@ message-editor .bg-card > div:last-child > div:last-child button:hover { opacity
 .tab .tab-close:hover { background: rgba(0,0,0,0.1); color: var(--text-strong); }
 .tab-content {
   flex: 1; overflow: auto; min-height: 0;
+  overflow-wrap: break-word; word-break: break-all;
 }
 .tab-content .preview-code {
   margin: 0; padding: 14px 16px; font-size: 13px; line-height: 1.6;

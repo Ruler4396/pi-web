@@ -21,24 +21,21 @@ function highlightCode(code: string, filename: string): string {
   return escaped;
 }
 
-interface FileTab {
-  path: string;
-  name: string;
-  content: string;
-}
+interface FileTab { path: string; name: string; content: string; }
 
 @customElement("session-chat")
 export class SessionChat extends LitElement {
   @property() sessionId = "";
   @state() private ready = false;
   @state() private error = "";
-  @state() private theme: "dark" | "" = "";
+  @state() private theme: "dark" | "" = "dark";
   @state() private sessionCwd = "/root";
   @state() private hasMessages = false;
   @state() private showTerminal = false;
   @state() private terminalContent = "";
   @state() private tabs: FileTab[] = [];
   @state() private activeTab = 0;
+  @state() private tabPanelWidth = 42; // percentage
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
   private msgInterval = 0;
@@ -51,7 +48,12 @@ export class SessionChat extends LitElement {
     }
     .error-wrap .err-msg { color: #b91c1c; font-size: 14px; font-weight: 500; }
     .error-wrap button { margin-top: 8px; padding: 6px 18px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
-    .term-btn svg { display: block; }
+    .resize-handle {
+      width: 3px; cursor: col-resize; flex-shrink: 0;
+      background: transparent; transition: background 0.15s;
+      position: relative; z-index: 2;
+    }
+    .resize-handle:hover, .resize-handle.active { background: rgba(37,99,235,0.3); }
   `;
 
   createRenderRoot() { return this; }
@@ -59,9 +61,13 @@ export class SessionChat extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
     const saved = localStorage.getItem(THEME_KEY);
-    if (saved === "dark" || saved === "") {
-      this.theme = saved;
-      document.documentElement.dataset.theme = saved;
+    if (!saved || saved === "" || saved === "dark") {
+      this.theme = "dark";
+      document.documentElement.dataset.theme = "dark";
+      localStorage.setItem(THEME_KEY, "dark");
+    } else if (saved === "light") {
+      this.theme = "";
+      document.documentElement.dataset.theme = "";
     }
     try { await this.initChat(); this.ready = true; } catch (e: any) { this.error = e.message || "Failed"; }
     this.requestUpdate();
@@ -109,14 +115,13 @@ export class SessionChat extends LitElement {
     const next = this.theme === "dark" ? "" : "dark";
     this.theme = next;
     document.documentElement.dataset.theme = next;
-    localStorage.setItem(THEME_KEY, next);
+    localStorage.setItem(THEME_KEY, next === "dark" ? "dark" : "light");
   };
 
   async toggleFileTab(relPath: string, name: string) {
     const existing = this.tabs.findIndex(t => t.path === relPath);
     if (existing >= 0) {
       if (this.activeTab === existing) {
-        // Close active tab
         this.tabs = this.tabs.filter((_, i) => i !== existing);
         this.activeTab = Math.min(this.activeTab, this.tabs.length - 1);
       } else {
@@ -125,35 +130,77 @@ export class SessionChat extends LitElement {
       this.requestUpdate();
       return;
     }
-    // Add new tab
     const newTab: FileTab = { path: relPath, name, content: "" };
     this.tabs = [...this.tabs, newTab];
     this.activeTab = this.tabs.length - 1;
     this.requestUpdate();
-    // Fetch content
     const absPath = this.sessionCwd.replace(/\/+$/, "") + "/" + relPath;
     try {
       const res = await fetch("/api/file/read?path=" + encodeURIComponent(absPath));
       if (res.ok) {
         const data = await res.json();
         const idx = this.tabs.findIndex(t => t.path === relPath);
-        if (idx >= 0) {
-          this.tabs[idx].content = data.content || "";
-          this.requestUpdate();
-        }
+        if (idx >= 0) { this.tabs[idx].content = data.content || ""; this.requestUpdate(); }
       }
     } catch {}
   }
 
-  closeTab(index: number, e: Event) {
+  closeTab = (index: number, e: Event) => {
     e.stopPropagation();
     this.tabs = this.tabs.filter((_, i) => i !== index);
     this.activeTab = Math.min(this.activeTab, this.tabs.length - 1);
     this.requestUpdate();
-  }
+  };
 
-  toggleTerminal() {
+  toggleTerminal = () => {
     this.showTerminal = !this.showTerminal;
+    this.requestUpdate();
+  };
+
+  private resizeStartX = 0;
+  private resizeStartW = 0;
+  private resizing = false;
+
+  onResizeStart = (e: MouseEvent) => {
+    e.preventDefault();
+    this.resizeStartX = e.clientX;
+    this.resizeStartW = this.tabPanelWidth;
+    this.resizing = true;
+    document.addEventListener("mousemove", this.onResizeMove);
+    document.addEventListener("mouseup", this.onResizeEnd);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  onResizeMove = (e: MouseEvent) => {
+    if (!this.resizing) return;
+    const container = this.querySelector<HTMLElement>(".main-row");
+    if (!container) return;
+    const dx = e.clientX - this.resizeStartX;
+    const cw = container.getBoundingClientRect().width;
+    const newW = Math.min(65, Math.max(20, this.resizeStartW + (dx / cw) * 100));
+    this.tabPanelWidth = Math.round(newW);
+    this.requestUpdate();
+  };
+
+  onResizeEnd = () => {
+    this.resizing = false;
+    document.removeEventListener("mousemove", this.onResizeMove);
+    document.removeEventListener("mouseup", this.onResizeEnd);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+  };
+
+  async runTerminalCommand(cmd: string, input: HTMLTextAreaElement) {
+    this.terminalContent += "$ " + cmd + "\n";
+    input.value = "";
+    this.requestUpdate();
+    try {
+      const res = await fetch("/api/file/read?path=" + encodeURIComponent("/tmp/term-test"));
+      this.terminalContent += "(terminal not connected)\n";
+    } catch {
+      this.terminalContent += "(command failed)\n";
+    }
     this.requestUpdate();
   }
 
@@ -172,6 +219,7 @@ export class SessionChat extends LitElement {
     const sid = this.sessionId.slice(0, 8);
     const showWelcome = !this.hasMessages && this.tabs.length === 0;
     const activeTabData = this.tabs[this.activeTab];
+    const hasResize = this.tabs.length > 0;
 
     return html`
       <div class="chat-wrapper">
@@ -185,20 +233,19 @@ export class SessionChat extends LitElement {
           <span class="divider">&#183;</span>
           <span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
           <div style="flex:1"></div>
-          <button class="term-btn theme-btn" @click=${this.toggleTerminal} title="Toggle Terminal">
+          <button class="theme-btn" @click=${this.toggleTerminal} title="终端">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           </button>
-          <button class="theme-btn" @click=${this.toggleTheme} title="Toggle theme">
+          <button class="theme-btn" @click=${this.toggleTheme} title="${this.theme === 'dark' ? '切换亮色' : '切换暗色'}">
             ${this.theme === "dark"
               ? html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
               : html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`}
           </button>
         </div>
 
-        <!-- Main content: sidebar | tabs | chat -->
-        <div style="flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden">
+        <div class="main-row" style="flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden">
           <!-- Sidebar -->
-          <div class="sidebar" style="width:260px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-base);border-right:0.5px solid rgba(0,0,0,0.07);flex-shrink:0">
+          <div class="sidebar" style="width:260px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-base);border-right:0.5px solid rgba(255,255,255,0.07);flex-shrink:0">
             <div class="sidebar-header">
               <span style="font-size:12px;font-weight:500;color:var(--text-weak);letter-spacing:0.04em">FILES</span>
               <file-upload></file-upload>
@@ -206,9 +253,9 @@ export class SessionChat extends LitElement {
             <file-tree rootpath=${this.sessionCwd} style="flex:1;overflow-y:auto;min-height:0;padding:4px 0"></file-tree>
           </div>
 
-          <!-- Tab panel (left part of right area) -->
+          <!-- Tab panel -->
           ${this.tabs.length > 0 ? html`
-            <div class="tab-panel" style="width:42%;min-width:280px;display:flex;flex-direction:column;border-right:0.5px solid rgba(0,0,0,0.07);background:var(--bg-base);flex-shrink:0">
+            <div class="tab-panel" style="width:${this.tabPanelWidth}%;min-width:200px;display:flex;flex-direction:column;border-right:0.5px solid rgba(255,255,255,0.07);background:var(--bg-base);flex-shrink:0">
               <div class="tab-bar">
                 ${this.tabs.map((t, i) => html`
                   <div class="tab ${i === this.activeTab ? 'active' : ''}" @click=${() => { this.activeTab = i; this.requestUpdate(); }}>
@@ -226,6 +273,8 @@ export class SessionChat extends LitElement {
                 ` : ""}
               </div>
             </div>
+            <div class="resize-handle ${this.resizing ? 'active' : ''}"
+              @mousedown=${this.onResizeStart}></div>
           ` : ""}
 
           <!-- Chat -->
@@ -245,7 +294,6 @@ export class SessionChat extends LitElement {
           </div>
         </div>
 
-        <!-- Terminal -->
         ${this.showTerminal ? html`
           <div class="terminal-panel">
             <div class="terminal-header">
@@ -258,14 +306,9 @@ export class SessionChat extends LitElement {
               </button>
             </div>
             <div class="terminal-body">
-              <textarea class="terminal-input"
-                placeholder="$ type a command..."
+              <textarea class="terminal-input" placeholder="$ type a command..."
                 @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    const cmd = (e.target as HTMLTextAreaElement).value.trim();
-                    if (cmd) this.runTerminalCommand(cmd, e.target as HTMLTextAreaElement);
-                  }
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); const cmd = (e.target as HTMLTextAreaElement).value.trim(); if (cmd) this.runTerminalCommand(cmd, e.target as HTMLTextAreaElement); }
                 }}></textarea>
               <pre class="terminal-output">${this.terminalContent}</pre>
             </div>
@@ -273,14 +316,5 @@ export class SessionChat extends LitElement {
         ` : ""}
       </div>
     `;
-  }
-
-  async runTerminalCommand(cmd: string, input: HTMLTextAreaElement) {
-    this.terminalContent += "$ " + cmd + "\n";
-    input.value = "";
-    this.requestUpdate();
-    // Simulate: show command was sent (real implementation needs backend shell API)
-    this.terminalContent += "(shell not connected)\n";
-    this.requestUpdate();
   }
 }
