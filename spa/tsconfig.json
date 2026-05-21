@@ -4,15 +4,13 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "noEmit": true,
     "jsx": "preserve",
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "experimentalDecorators": true,
     "useDefineForClassFields": false,
-    "outDir": "dist",
-    "rootDir": "src",
-    "declaration": false,
     "sourceMap": true
   },
   "include": ["src/**/*.ts"]

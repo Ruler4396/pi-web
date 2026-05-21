@@ -9,6 +9,7 @@ export class HttpAgent {
   private listeners: Set<(event: AgentEvent, signal: AbortSignal) => void | Promise<void>> = new Set();
   private abortController: AbortController | null = null;
   private _aborted = false;
+  chatPanel?: any;
 
   constructor(sessionId: string) {
     this.sessionId = sessionId;
@@ -223,7 +224,7 @@ export class HttpAgent {
     return {
       messageCount: this._state.messages.length,
       isStreaming: this._state.isStreaming,
-      model: this._state.model.label || this._state.model.id,
+      model: (this._state.model as any).label || (this._state.model as any).id,
       thinkingLevel: this._state.thinkingLevel,
     };
   }
@@ -254,14 +255,14 @@ export class HttpAgent {
 class HttpAgentState implements AgentState {
   systemPrompt = "You are a helpful AI assistant. Use tools when appropriate to read, write, edit files and run commands.";
   thinkingLevel: ThinkingLevel = "off";
-  private _tools: AgentTool<any>[] = [
-    { name: "read_file", description: "Read file contents", parameters: {} },
-    { name: "write_file", description: "Write file contents", parameters: {} },
-    { name: "edit_file", description: "Edit file with search/replace", parameters: {} },
-    { name: "bash", description: "Execute shell command", parameters: {} },
-    { name: "glob", description: "Find files by pattern", parameters: {} },
-    { name: "grep", description: "Search file contents", parameters: {} },
-    { name: "web_fetch", description: "Fetch web page content", parameters: {} },
+  private _tools: any[] = [
+    { name: "read_file", description: "Read file contents", parameters: {}, label: "Read File", execute: async () => ({}) },
+    { name: "write_file", description: "Write file contents", parameters: {}, label: "Write File", execute: async () => ({}) },
+    { name: "edit_file", description: "Edit file with search/replace", parameters: {}, label: "Edit File", execute: async () => ({}) },
+    { name: "bash", description: "Execute shell command", parameters: {}, label: "Bash", execute: async () => ({}) },
+    { name: "glob", description: "Find files by pattern", parameters: {}, label: "Glob", execute: async () => ({}) },
+    { name: "grep", description: "Search file contents", parameters: {}, label: "Grep", execute: async () => ({}) },
+    { name: "web_fetch", description: "Fetch web page content", parameters: {}, label: "Web Fetch", execute: async () => ({}) },
   ];
   private _messages: any[] = [];
   isStreaming = false;

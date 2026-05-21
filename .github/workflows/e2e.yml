@@ -1,0 +1,65 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+
+      - name: Build pi-web
+        run: cargo build --release
+
+      - name: Install SPA dependencies
+        working-directory: spa
+        run: npm ci
+
+      - name: Type check
+        working-directory: spa
+        run: npx tsc --noEmit
+
+      - name: Build SPA
+        working-directory: spa
+        run: npm run build
+
+      - name: Install Playwright
+        working-directory: spa
+        run: npx playwright install chromium --with-deps
+
+      - name: Start pi-web
+        run: |
+          mkdir -p /tmp/pi-sessions
+          PI_SESSIONS_DIR=/tmp/pi-sessions \
+          PI_WEB_AUTH_TOKEN=ubgTQYO4raVwMXLqNsPO6je2NbsS \
+          ./target/release/pi-web &
+          sleep 3
+          curl -s http://127.0.0.1:3000/api/health
+
+      - name: Run E2E tests
+        working-directory: spa
+        run: npx playwright test --reporter=list
+
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: spa/test-results/

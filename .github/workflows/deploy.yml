@@ -3,6 +3,7 @@ name: Build and Deploy
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -19,11 +20,17 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Install SPA dependencies
+        working-directory: spa
+        run: npm ci
+
+      - name: Type check
+        working-directory: spa
+        run: npx tsc --noEmit
+
       - name: Build SPA
         working-directory: spa
-        run: |
-          npm ci
-          npm run build
+        run: npm run build
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@master

@@ -84,14 +84,15 @@ export class SessionChat extends LitElement {
     document.addEventListener("dragleave", this.onGlobalDragLeave);
     document.addEventListener("drop", this.onGlobalDrop);
     // Context menu for file tree
-    this.addEventListener("file-contextmenu", ((e) => {
-      this.contextMenuNode = e.detail.node;
-      this.contextMenuX = e.detail.x;
-      this.contextMenuY = e.detail.y;
+    this.addEventListener("file-contextmenu", ((e: Event) => {
+      const ctxDetail = (e as CustomEvent).detail;
+      this.contextMenuNode = ctxDetail.node;
+      this.contextMenuX = ctxDetail.x;
+      this.contextMenuY = ctxDetail.y;
       this.contextMenuVisible = true;
       this.requestUpdate();
     }) as EventListener);
-    document.addEventListener("click", () => {
+    document.addEventListener("click", (_e: Event) => {
       if (this.contextMenuVisible) { this.contextMenuVisible = false; this.requestUpdate(); }
     });
   }
@@ -227,9 +228,13 @@ export class SessionChat extends LitElement {
             this.dragHoverNode = name;
             this.dragHoverStart = Date.now();
           } else if (Date.now() - this.dragHoverStart > 600) {
-            // Auto-expand: dispatch click on the tree node
-            treeNode.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-            this.dragHoverNode = null; // reset to avoid re-expanding
+            // Auto-expand: only if directory is NOT already expanded
+            const ft = this.querySelector("file-tree") as any;
+            const alreadyExpanded = ft && ft.expanded && ft.expanded.has(name);
+            if (!alreadyExpanded) {
+              treeNode.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+            }
+            this.dragHoverNode = null;
           }
         } else {
           this.dragHoverNode = null;
@@ -304,7 +309,7 @@ export class SessionChat extends LitElement {
       });
       const ft = this.querySelector("file-tree") as any;
       if (ft && ft.loadDir) { try { await ft.loadDir(this.sessionCwd); } catch(e) {} }
-    } catch(e) { console.error(e); }
+    } catch(e: any) { console.error(e); }
   }
 
   async uploadDroppedFiles(files: FileList, cwd: string) {
@@ -324,7 +329,7 @@ export class SessionChat extends LitElement {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ path: fullPath, content: base64, encoding: "base64" }),
         });
-      } catch(e) { console.error("Upload error:", e); }
+      } catch(e: any) { console.error("Upload error:", e); }
     }
     // Refresh file tree
     const ft = this.querySelector("file-tree") as any;
@@ -368,7 +373,7 @@ export class SessionChat extends LitElement {
       } else {
         this.terminalContent += "(command failed)\n";
       }
-    } catch(e) {
+    } catch(e: any) {
       this.terminalContent += "(error: " + e.message + ")\n";
     }
     this.requestUpdate();

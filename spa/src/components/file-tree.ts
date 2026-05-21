@@ -124,7 +124,7 @@ export class FileTree extends LitElement {
     return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
   }
 
-  renderNode(node: FileNode) {
+  renderNode(node: FileNode): any {
     const isExpanded = this.expanded.has(node.path);
     const isSelected = this.selected === node.path;
     const isDir = node.type === "directory";
@@ -138,7 +138,7 @@ export class FileTree extends LitElement {
         ${node.size ? html`<span class="size">${this.formatSize(node.size)}</span>` : ""}
       </div>
       ${node.children && isExpanded ? html`
-        <div class="children">${node.children.map(c => this.renderNode(c))}</div>
+        <div class="children">${node.children.map((c: FileNode) => this.renderNode(c))}</div>
       ` : ""}
     `;
   }
