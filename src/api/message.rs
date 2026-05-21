@@ -51,8 +51,14 @@ pub async fn send(
     let message = body["message"].as_str().unwrap_or_default().to_string();
     let thinking_level = body["thinkingLevel"].as_str().unwrap_or("off");
     let mut rx = agent.subscribe();
-    let mut cmd = RpcCommand::prompt(&message);
-    cmd.extra = serde_json::json!({"thinkingLevel": thinking_level});
+    // Check if this is a /goal command
+    let cmd = if let Some(goal_text) = message.strip_prefix("/goal ") {
+        RpcCommand::goal(goal_text.trim(), 30)
+    } else {
+        let mut cmd = RpcCommand::prompt(&message);
+        cmd.extra = serde_json::json!({"thinkingLevel": thinking_level});
+        cmd
+    };
     agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let stream = async_stream::stream! {
         loop {

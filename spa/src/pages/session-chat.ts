@@ -41,13 +41,16 @@ export class SessionChat extends LitElement {
     if (cur?.thinking && cur?.thinkingLevels?.length) {
       this.availableThinkingLevels = cur.thinkingLevels;
     }
+    if (cur?.contextLimit) {
+      this.contextMax = cur.contextLimit;
+    }
     return cur?.thinking === true;
   }
   @state() showAddModelDialog = false;
   @state() showSettings = false;
   @state() showShortcuts = false; @state() showConfig = false;
   @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh" }; @state() showSlashCommands = false;
-  @state() toasts: {id: number, text: string, type: string}[] = []; contextTokens = 0; contextMax = 65536;
+  @state() toasts: {id: number, text: string, type: string}[] = []; contextTokens = 0; contextMax = 1048576; // DeepSeek V4 1M context
   @state() apiKeys: Record<string, string> = {};
   _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
@@ -898,7 +901,7 @@ export class SessionChat extends LitElement {
             ` : ""}
             <div class="context-bar">
               <div class="context-bar-fill" style="width:${Math.min(100, this.contextTokens / this.contextMax * 100)}%"></div>
-              <span class="context-bar-text">${this.contextTokens.toLocaleString()} / ${(this.contextMax/1000).toFixed(0)}k</span>
+              <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.contextTokens.toLocaleString()} / ${(this.contextMax/1000).toFixed(0)}k</span>
             </div>
             <div class="slash-dropdown ${this.showSlashCommands ? 'active' : ''}">
               <div class="slash-item" @click=${() => { this.handleCommand('/help'); this.showSlashCommands = false; }}>

@@ -149,6 +149,18 @@ impl RpcCommand {
     }
 
     // === Hermes commands ===
+    pub fn goal(goal_text: &str, max_iterations: u32) -> Self {
+        Self {
+            command_type: "goal".into(),
+            id: Some(uuid::Uuid::new_v4().to_string()),
+            message: None,
+            provider: None,
+            model_id: None,
+            session_id: None,
+            extra: serde_json::json!({"goal": goal_text, "max_iterations": max_iterations}),
+        }
+    }
+
     pub fn hermes_status() -> Self {
         Self { command_type: "hermes_status".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra: Value::Object(Default::default()) }
     }
