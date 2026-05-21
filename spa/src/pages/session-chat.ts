@@ -31,6 +31,10 @@ export class SessionChat extends LitElement {
   @state() private sessionCwd = "/root";
   @state() private hasMessages = false;
   @state() private showTerminal = false;
+  @state() private showModelDropdown = false;
+  @state() private modelProvider = "deepseek";
+  @state() private modelId = "deepseek-chat";
+  @state() private modelLabel = "DeepSeek Chat";
   @state() private terminalContent = "";
   @state() private terminalCwd = "/root";
   @state() private tabs: FileTab[] = [];
@@ -131,6 +135,19 @@ export class SessionChat extends LitElement {
     }, 500);
     this.requestUpdate();
   }
+
+  toggleModelDropdown = () => { this.showModelDropdown = !this.showModelDropdown; this.requestUpdate(); };
+  selectModel = (provider: string, id: string, label: string) => {
+    this.modelProvider = provider; this.modelId = id; this.modelLabel = label;
+    this.showModelDropdown = false;
+    if (this.agent) {
+      this.agent.setModel(provider, id).catch(() => {});
+      // Also update the ChatPanel's internal model
+      const state = this.agent.state as any;
+      if (state._state) state._state.model = { provider, id, label };
+    }
+    this.requestUpdate();
+  };
 
   toggleTerminal = () => { this.showTerminal = !this.showTerminal; this.requestUpdate(); };
 
@@ -409,6 +426,23 @@ export class SessionChat extends LitElement {
           <span class="divider">&#183;</span><span class="sid">${sid}</span>
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
           <div style="flex:1"></div>
+          <div class="model-select-wrap" style="position:relative">
+            <button class="model-pill" @click=${this.toggleModelDropdown} title="Switch model">
+              <span class="model-pill-name">${this.modelLabel}</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            ${this.showModelDropdown ? html`
+              <div class="model-dropdown">
+                <div class="model-section-title">DeepSeek</div>
+                <div class="model-option ${this.modelId === 'deepseek-chat' ? 'active' : ''}" @click=${() => this.selectModel('deepseek', 'deepseek-chat', 'DeepSeek Chat')}>DeepSeek Chat</div>
+                <div class="model-option ${this.modelId === 'deepseek-reasoner' ? 'active' : ''}" @click=${() => this.selectModel('deepseek', 'deepseek-reasoner', 'DeepSeek R1')}>DeepSeek R1</div>
+                <div class="model-section-title">Anthropic</div>
+                <div class="model-option ${this.modelId === 'claude-sonnet-4-5' ? 'active' : ''}" @click=${() => this.selectModel('anthropic', 'claude-sonnet-4-5', 'Claude Sonnet 4.5')}>Claude Sonnet 4.5</div>
+                <div class="model-option ${this.modelId === 'claude-haiku-4-5' ? 'active' : ''}" @click=${() => this.selectModel('anthropic', 'claude-haiku-4-5', 'Claude Haiku 4.5')}>Claude Haiku 4.5</div>
+              </div>
+            ` : ""}
+          </div>
+
           <button class="theme-btn" @click=${this.toggleTerminal} title="终端">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           </button>
