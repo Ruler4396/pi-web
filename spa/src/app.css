@@ -139,16 +139,12 @@ message-editor .bg-card > div:last-child > div:last-child button { opacity: 0.5 
 message-editor .bg-card > div:last-child > div:last-child button:hover { opacity: 1 !important; color: var(--accent) !important; background: rgba(37,99,235,0.08) !important; }
 
 /* ===== Tab panel (VSCode-style file tabs) ===== */
-.tab-panel {
-  background: var(--bg-base);
-  overflow: hidden;
-}
+.tab-panel { background: var(--bg-base); overflow: hidden; }
 .tab-bar {
   display: flex; align-items: flex-end; gap: 0;
   background: var(--bg-weak);
   border-bottom: 1px solid rgba(0,0,0,0.06);
-  overflow-x: auto; flex-shrink: 0;
-  min-height: 32px;
+  overflow-x: auto; flex-shrink: 0; min-height: 32px;
 }
 .tab-bar::-webkit-scrollbar { height: 0; }
 .tab {
@@ -158,8 +154,7 @@ message-editor .bg-card > div:last-child > div:last-child button:hover { opacity
   color: var(--text-weak); background: transparent;
   border-right: 0.5px solid rgba(0,0,0,0.05);
   white-space: nowrap; flex-shrink: 0;
-  transition: background 0.1s; user-select: none;
-  max-width: 160px;
+  transition: background 0.1s; user-select: none; max-width: 160px;
 }
 .tab:hover { background: rgba(0,0,0,0.04); color: var(--text-base); }
 .tab.active { background: var(--bg-base); color: var(--text-strong); }
@@ -174,13 +169,15 @@ message-editor .bg-card > div:last-child > div:last-child button:hover { opacity
 .tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
 .tab .tab-close:hover { background: rgba(0,0,0,0.1); color: var(--text-strong); }
 .tab-content {
-  flex: 1; overflow: auto; min-height: 0;
-  overflow-wrap: break-word; word-break: break-all;
+  flex: 1; overflow: hidden; min-height: 0;
+  display: flex; flex-direction: column;
 }
 .tab-content .preview-code {
-  margin: 0; padding: 14px 16px; font-size: 13px; line-height: 1.6;
+  flex: 1; margin: 0; padding: 14px 16px; font-size: 13px; line-height: 1.6;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   white-space: pre; color: var(--text-base); tab-size: 2; background: transparent;
+  overflow: auto;
+  max-width: 100%; overflow-wrap: break-word; word-break: break-all;
 }
 .preview-loading {
   display: block; padding: 16px; text-align: center; font-size: 13px;
@@ -250,3 +247,19 @@ message-editor .bg-card > div:last-child > div:last-child button:hover { opacity
 [data-theme="dark"] .sidebar { background: var(--bg-base); }
 [data-theme="dark"] .tree-node:hover { background: rgba(255,255,255,0.06); }
 [data-theme="dark"] .tree-node.selected { background: rgba(255,255,255,0.08); color: var(--accent); }
+
+/* Dark mode editor fixes */
+[data-theme="dark"] message-editor .bg-card { background: #1a1a1a !important; }
+[data-theme="dark"] message-editor textarea { color: #e0e0e0 !important; }
+[data-theme="dark"] message-editor textarea::placeholder { color: #666 !important; }
+[data-theme="dark"] message-editor .bg-card > div:last-child button { color: #999 !important; }
+[data-theme="dark"] message-editor .bg-card > div:last-child button:hover { color: #fff !important; background: rgba(255,255,255,0.08) !important; }
+[data-theme="dark"] message-editor .bg-card > div:last-child > div:last-child button:hover { color: var(--accent) !important; background: rgba(37,99,235,0.15) !important; }
+
+/* Dark mode tab bar */
+[data-theme="dark"] .tab-bar { background: var(--bg-weak); border-color: rgba(255,255,255,0.06); }
+[data-theme="dark"] .tab { border-color: rgba(255,255,255,0.04); color: var(--text-weak); }
+[data-theme="dark"] .tab:hover { background: rgba(255,255,255,0.04); }
+[data-theme="dark"] .tab.active { background: var(--bg-base); color: var(--text-strong); }
+[data-theme="dark"] .tab .tab-close:hover { background: rgba(255,255,255,0.1); }
+[data-theme="dark"] .resize-handle:hover, [data-theme="dark"] .resize-handle.active { background: rgba(37,99,235,0.4); }
