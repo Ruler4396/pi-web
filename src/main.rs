@@ -49,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/file/delete", axum::routing::post(api::file::delete_file))
         .route("/api/shell/exec", axum::routing::post(api::shell::exec))
         .route("/api/models", get(api::session::models))
+        .route("/api/keys", get(api::session::get_keys).post(api::session::save_keys))
         .route("/api/models/save", axum::routing::post(api::session::save_model))
         .route("/api/models/delete/{provider}/{model_id}", axum::routing::delete(api::session::delete_model))
         .route("/api/config", get(api::config::get_config))

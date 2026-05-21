@@ -85,6 +85,30 @@ pub async fn update(
     Ok(StatusCode::NO_CONTENT)
 }
 
+
+
+pub async fn get_keys(State(state): State<AppState>) -> Result<Json<serde_json::Value>, StatusCode> {
+    if state.config.keys_file.exists() {
+        let content = tokio::fs::read_to_string(&state.config.keys_file).await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let keys: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        Ok(Json(keys))
+    } else {
+        Ok(Json(serde_json::json!({})))
+    }
+}
+
+pub async fn save_keys(
+    State(state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<StatusCode, StatusCode> {
+    let json = serde_json::to_string(&body).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    tokio::fs::write(&state.config.keys_file, json).await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(StatusCode::OK)
+}
+
 pub async fn models(State(state): State<AppState>) -> Result<Json<serde_json::Value>, StatusCode> {
     let builtin = vec![
         serde_json::json!({"provider": "deepseek", "id": "deepseek-v4-flash", "label": "DeepSeek V4 Flash", "thinking": true, "builtin": true}),

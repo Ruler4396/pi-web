@@ -23,17 +23,34 @@ impl PiAgent {
         pi_binary: &std::path::Path,
         session_dir: &std::path::Path,
         session_file: &std::path::Path,
+        keys_file: &std::path::Path,
     ) -> anyhow::Result<Self> {
         let (event_tx, _) = broadcast::channel(256);
 
-        let mut child = Command::new(pi_binary)
-            .arg("--mode").arg("rpc")
+        let mut cmd = Command::new(pi_binary);
+        cmd.arg("--mode").arg("rpc")
             .arg("--session").arg(session_file)
             .arg("--session-dir").arg(session_dir)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
+            .stderr(Stdio::piped());
+
+        // Inject API keys from keys.json as env vars
+        if keys_file.exists() {
+            if let Ok(content) = std::fs::read_to_string(keys_file) {
+                if let Ok(keys) = serde_json::from_str::<serde_json::Value>(&content) {
+                    if let Some(obj) = keys.as_object() {
+                        for (k, v) in obj {
+                            if let Some(val) = v.as_str() {
+                                cmd.env(k, val);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut child = cmd.spawn()
             .with_context(|| "failed to spawn pi process")?;
 
         let stdin = child.stdin.take().context("failed to open pi stdin")?;

@@ -35,6 +35,9 @@ export class SessionChat extends LitElement {
   @state() modelProvider = "deepseek"; @state() modelId = "deepseek-v4-flash"; @state() modelLabel = "DeepSeek V4 Flash";
   @state() thinkingLevel = "off";
   @state() showAddModelDialog = false;
+  @state() showSettings = false;
+  @state() apiKeys: Record<string, string> = {};
+  _newKeyName = ""; _newKeyValue = "";
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
   @state() addModelForm = { provider: "", id: "", label: "", apiKey: "", baseUrl: "", thinking: false };
   @state() private terminalContent = "";
@@ -170,6 +173,26 @@ export class SessionChat extends LitElement {
     if (this.agent) this.agent.setThinking(level).catch(() => {});
     this.requestUpdate();
   };
+  toggleSettings = async () => {
+    this.showSettings = !this.showSettings;
+    if (this.showSettings) {
+      try {
+        const res = await fetch("/api/keys");
+        this.apiKeys = await res.json();
+      } catch (_) {}
+    }
+    this.requestUpdate();
+  };
+  saveApiKeys = async () => {
+    await fetch("/api/keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(this.apiKeys),
+    });
+    this.showSettings = false;
+    this.requestUpdate();
+  };
+
   openAddModel = () => {
     this.showModelDropdown = false;
     this.showAddModelDialog = true;
@@ -550,12 +573,58 @@ export class SessionChat extends LitElement {
           <button class="theme-btn" @click=${this.toggleTerminal} title="终端">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           </button>
+          <button class="theme-btn" @click=${this.toggleSettings} title="Settings">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
           <button class="theme-btn" @click=${this.toggleTheme} title="${this.theme === 'dark' ? '亮色' : '暗色'}">
             ${this.theme === "dark"
               ? html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
               : html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`}
           </button>
         </div>
+        ${this.showSettings ? html`
+          <div class="modal-overlay" @click=${() => { this.showSettings = false; this.requestUpdate(); }}></div>
+          <div class="model-dialog" style="width:400px">
+            <div class="model-dialog-header">
+              <span>API Keys</span>
+              <button class="model-dialog-close" @click=${() => { this.showSettings = false; this.requestUpdate(); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="model-dialog-body" style="max-height:60vh;overflow-y:auto">
+              ${Object.keys(this.apiKeys).length === 0 ? html`<div style="color:var(--text-weaker);font-size:13px;padding:20px 0;text-align:center">No API keys configured</div>` : ""}
+              ${Object.entries(this.apiKeys).map(([name, value]) => html`
+                <div class="model-dialog-row" style="align-items:flex-end">
+                  <div class="model-dialog-field" style="flex:1">
+                    <label>${name}</label>
+                    <input type="password" .value=${value || ""} @input=${(e: InputEvent) => { this.apiKeys = { ...this.apiKeys, [name]: (e.target as HTMLInputElement).value }; }}>
+                  </div>
+                  <button style="width:28px;height:28px;padding:4px;background:none;border:none;border-radius:4px;cursor:pointer;color:var(--text-weaker);flex-shrink:0;margin-bottom:1px" @click=${() => { const newKeys = { ...this.apiKeys }; delete newKeys[name]; this.apiKeys = newKeys; this.requestUpdate(); }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+              `)}
+              <div class="model-dialog-row" style="align-items:flex-end">
+                <div class="model-dialog-field" style="flex:1">
+                  <label>Add Key</label>
+                  <input type="text" placeholder="KEY_NAME" .value=${this._newKeyName || ""} @input=${(e: InputEvent) => { this._newKeyName = (e.target as HTMLInputElement).value; }}>
+                </div>
+                <div class="model-dialog-field" style="flex:1">
+                  <label>&nbsp;</label>
+                  <input type="password" placeholder="value" .value=${this._newKeyValue || ""} @input=${(e: InputEvent) => { this._newKeyValue = (e.target as HTMLInputElement).value; }}>
+                </div>
+                <button style="width:28px;height:28px;padding:4px;background:none;border:none;border-radius:4px;cursor:pointer;color:var(--accent);flex-shrink:0;margin-bottom:1px" @click=${() => { if (this._newKeyName) { this.apiKeys = { ...this.apiKeys, [this._newKeyName!]: this._newKeyValue || "" }; this._newKeyName = ""; this._newKeyValue = ""; this.requestUpdate(); } }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="model-dialog-footer">
+              <div style="font-size:11px;color:var(--text-weaker);flex:1;padding-top:4px">Keys stored in keys.json, injected as env vars to pi process</div>
+              <button class="model-dialog-cancel" @click=${() => { this.showSettings = false; this.requestUpdate(); }}>Cancel</button>
+              <button class="model-dialog-submit" @click=${this.saveApiKeys}>Save</button>
+            </div>
+          </div>
+        ` : ""}
         ${this.showAddModelDialog ? html`
           <div class="modal-overlay" @click=${this.closeAddModel}></div>
           <div class="model-dialog">

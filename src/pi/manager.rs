@@ -34,7 +34,7 @@ impl SessionManager {
 
         let session_file = self.session_path(session_id);
         self.init_session_file(&session_file, session_id).await?;
-        let agent = PiAgent::spawn(&self.config.pi_binary, &self.config.sessions_dir, &session_file)
+        let agent = PiAgent::spawn(&self.config.pi_binary, &self.config.sessions_dir, &session_file, &self.config.keys_file)
             .await
             .with_context(|| format!("failed to create session {session_id}"))?;
 

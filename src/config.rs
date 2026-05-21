@@ -6,6 +6,7 @@ pub struct Config {
     pub pi_binary: PathBuf,
     pub sessions_dir: PathBuf,
     pub auth_token: String,
+    pub keys_file: PathBuf,
 }
 
 impl Config {
@@ -28,11 +29,16 @@ impl Config {
 
         let auth_token = std::env::var("PI_WEB_AUTH_TOKEN").unwrap_or_default();
 
+        let keys_file = std::env::var("PI_WEB_KEYS_FILE")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| sessions_dir.parent().unwrap_or(&sessions_dir).join("keys.json"));
+
         Ok(Self {
             port,
             pi_binary,
             sessions_dir,
             auth_token,
+            keys_file,
         })
     }
 
