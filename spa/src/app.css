@@ -490,3 +490,17 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 .thinking-dropdown .model-option.active.thinking-opt-low { color: #34d399 !important; }
 .thinking-dropdown .model-option.active.thinking-opt-medium { color: #fbbf24 !important; }
 .thinking-dropdown .model-option.active.thinking-opt-high { color: #fb7185 !important; }
+
+/* max - violet */
+.thinking-max { color: #a78bfa; }
+.thinking-max .thinking-dot { background: #a78bfa; }
+.thinking-max:hover { background: rgba(167,139,250,0.1); }
+.thinking-opt-max { color: #a78bfa; }
+/* xhigh - intense pink */
+.thinking-xhigh { color: #f472b6; }
+.thinking-xhigh .thinking-dot { background: #f472b6; }
+.thinking-xhigh:hover { background: rgba(244,114,182,0.1); }
+.thinking-opt-xhigh { color: #f472b6; }
+/* Active overrides */
+.thinking-dropdown .model-option.active.thinking-opt-max { color: #a78bfa !important; }
+.thinking-dropdown .model-option.active.thinking-opt-xhigh { color: #f472b6 !important; }

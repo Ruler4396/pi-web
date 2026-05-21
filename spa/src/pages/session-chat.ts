@@ -530,6 +530,8 @@ export class SessionChat extends LitElement {
                 <div class="model-option thinking-opt-low ${this.thinkingLevel === "low" ? "active" : ""}" @click=${() => this.setThinkingLevel("low")}>Low</div>
                 <div class="model-option thinking-opt-medium ${this.thinkingLevel === "medium" ? "active" : ""}" @click=${() => this.setThinkingLevel("medium")}>Medium</div>
                 <div class="model-option thinking-opt-high ${this.thinkingLevel === "high" ? "active" : ""}" @click=${() => this.setThinkingLevel("high")}>High</div>
+                <div class="model-option thinking-opt-max ${this.thinkingLevel === "max" ? "active" : ""}" @click=${() => this.setThinkingLevel("max")}>Max</div>
+                <div class="model-option thinking-opt-xhigh ${this.thinkingLevel === "xhigh" ? "active" : ""}" @click=${() => this.setThinkingLevel("xhigh")}>XHigh</div>
               </div>
             ` : ""}
           </div>
