@@ -954,46 +954,20 @@ export class SessionChat extends LitElement {
               <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.contextTokens.toLocaleString()} / ${(this.contextMax/1000).toFixed(0)}k</span>
             </div>
             <div class="slash-dropdown ${this.showSlashCommands ? 'active' : ''}">
-              <div class="slash-item" @click=${() => { this.handleCommand('/help'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/help</span><span class="slash-desc">显示快捷键</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.handleCommand('/clear'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/clear</span><span class="slash-desc">清空对话</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.handleCommand('/models'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/models</span><span class="slash-desc">选择模型</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.handleCommand('/theme dark'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/theme dark</span><span class="slash-desc">暗色模式</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.handleCommand('/theme light'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/theme light</span><span class="slash-desc">亮色模式</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.handleCommand('/keys'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/keys</span><span class="slash-desc">API 密钥</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.handleCommand("/config"); this.showSlashCommands = false; }}>
-                <span class="slash-label">/config</span><span class="slash-desc">系统配置</span>
-              </div>
-              <div class="slash-section">AI 指令</div>
-              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
-                <span class="slash-label">/init</span><span class="slash-desc">初始化项目分析</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
-                <span class="slash-label">/plan</span><span class="slash-desc">制定实施计划</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
-                <span class="slash-label">/goal</span><span class="slash-desc">设定长期目标，自主执行迭代直到完成</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
-                <span class="slash-label">/fork</span><span class="slash-desc">分支对话</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
-                <span class="slash-label">/compact</span><span class="slash-desc">压缩上下文</span>
-              </div>
-              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
-                <span class="slash-label">/btw</span><span class="slash-desc">临时提问，不污染对话历史</span>
-              </div>
+              ${this.slashCommands.map((c, i) => html`
+                ${i === 7 ? html`<div class="slash-section">AI 指令</div>` : ""}
+                <div class="slash-item${i === this.slashIdx ? ' selected' : ''}" @click=${() => {
+                  const editor = this.querySelector("message-editor");
+                  const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea");
+                  if (ta) { (ta as HTMLTextAreaElement).value = c.cmd + " "; ta.focus(); }
+                  this.showSlashCommands = false;
+                  this.requestUpdate();
+                }}>
+                  <span class="slash-label">${c.cmd}</span>
+                  <span class="slash-desc">${c.desc}</span>
+                  ${c.action === "ai" ? html`<span class="slash-badge">AI</span>` : ""}
+                </div>
+              `)}
             </div>
             ${this.chatPanel}
           </div>
