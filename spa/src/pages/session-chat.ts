@@ -126,6 +126,14 @@ export class SessionChat extends LitElement {
       this.theme = "";
       document.documentElement.dataset.theme = "";
     }
+    // Restore persisted model and thinking level
+    try {
+      const saved = JSON.parse(localStorage.getItem("pi-current-model") || "");
+      if (saved?.id) { this.modelProvider = saved.provider; this.modelId = saved.id; this.modelLabel = saved.label; }
+    } catch {}
+    const savedThink = localStorage.getItem("pi-current-thinking");
+    if (savedThink) this.thinkingLevel = savedThink;
+
     try { await this.initChat(); this.ready = true; } catch (e: any) { this.error = e.message || "Failed"; }
     this.requestUpdate();
 
@@ -171,6 +179,37 @@ export class SessionChat extends LitElement {
       onBeforeSend: () => { this.hasMessages = true; this.requestUpdate(); },
       onApiKeyRequired: async () => true,
     });
+
+    // Hook slash command on message editor textarea
+    const installSlashHook = () => {
+      const editor = this.querySelector("message-editor");
+      if (!editor) { setTimeout(installSlashHook, 500); return; }
+      const ta = (editor as any).shadowRoot?.querySelector("textarea") || editor.querySelector("textarea");
+      if (!ta) { setTimeout(installSlashHook, 500); return; }
+      ta.addEventListener("input", (e: InputEvent) => {
+        const val = (e.target as HTMLTextAreaElement).value;
+        if (val === "/") { this.showSlashCommands = true; this.slashIdx = 0; this.requestUpdate(); }
+        else if (this.showSlashCommands && !val.startsWith("/")) { this.showSlashCommands = false; this.requestUpdate(); }
+        else if (this.showSlashCommands && val.length > 1) {
+          const q = val.slice(1).toLowerCase();
+          this.slashIdx = this.slashCommands.findIndex(c => c.cmd.startsWith("/" + q));
+          if (this.slashIdx < 0) this.slashIdx = 0;
+          this.requestUpdate();
+        }
+      });
+      ta.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (!this.showSlashCommands) return;
+        if (e.key === "ArrowDown") { e.preventDefault(); this.slashIdx = (this.slashIdx + 1) % this.slashCommands.length; this.requestUpdate(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); this.slashIdx = (this.slashIdx - 1 + this.slashCommands.length) % this.slashCommands.length; this.requestUpdate(); }
+        else if (e.key === "Enter" && this.showSlashCommands) {
+          e.preventDefault();
+          const cmd = this.slashCommands[this.slashIdx];
+          if (cmd) { (e.target as HTMLTextAreaElement).value = cmd.cmd + " "; this.showSlashCommands = false; this.requestUpdate(); }
+        }
+        else if (e.key === "Escape") { this.showSlashCommands = false; this.requestUpdate(); }
+      });
+    };
+    setTimeout(installSlashHook, 1000);
     try {
       const res = await fetch("/api/session");
       if (res.ok) {
@@ -203,6 +242,7 @@ export class SessionChat extends LitElement {
     filtered.unshift(entry);
     localStorage.setItem("pi-recent-models", JSON.stringify(filtered.slice(0, 5)));
     this.recentModels = filtered.slice(0, 5);
+    localStorage.setItem("pi-current-model", JSON.stringify({ provider, id, label }));
     this.requestUpdate();
   };
   deleteCustomModel = (provider: string, modelId: string, e: Event) => {
@@ -708,16 +748,10 @@ export class SessionChat extends LitElement {
               <div class="shortcuts-section">编辑器</div>
               <div class="shortcut-row"><kbd>Enter</kbd><span>发送消息</span></div>
               <div class="shortcut-row"><kbd>Shift+Enter</kbd><span>换行</span></div>
-              <div class="shortcuts-section">斜杠命令</div>
-              <div class="shortcut-row"><kbd>/help</kbd><span>显示快捷键</span></div>
-              <div class="shortcut-row"><kbd>/clear</kbd><span>清空对话</span></div>
-              <div class="shortcut-row"><kbd>/models</kbd><span>打开模型选择</span></div>
-              <div class="shortcut-row"><kbd>/theme dark|light</kbd><span>切换主题</span></div>
-              <div class="shortcut-row"><kbd>/keys</kbd><span>管理 API 密钥</span></div>
               <div class="shortcuts-section">终端</div>
               <div class="shortcut-row"><kbd>Enter</kbd><span>执行命令</span></div>
-              <div class="shortcuts-section">思考</div>
-              <div class="shortcut-row"><kbd>Click</kbd><span>切换思考等级</span></div>
+              <div class="shortcuts-section">输入框</div>
+              <div class="shortcut-row"><kbd>/</kbd><span>打开命令菜单 (上下键选择, 回车确认)</span></div>
             </div>
           </div>
         ` : ""}

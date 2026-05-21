@@ -705,3 +705,6 @@ message-list .message-body, streaming-message-container .message-body {
 .ctx-detail-row span:first-child { color: var(--text-weaker); }
 .ctx-detail-row span:last-child { color: var(--text-base); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
 [data-theme= dark] .context-detail { background: #1e1e1e; }
+
+/* Fix horizontal scrollbar in dialogs */
+.model-dialog-body { overflow-x: hidden; }

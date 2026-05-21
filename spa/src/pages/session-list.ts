@@ -141,7 +141,7 @@ export class SessionList extends LitElement {
 
   render() {
     return html`
-      <div class="container">
+      <div class="container" style="min-height:400px">
         <div class="hero">
           <div class="logo">${chatSvg}</div>
           <h1>Pi Web</h1>
@@ -198,7 +198,7 @@ export class SessionList extends LitElement {
               </div>
               <div class="dir-list">
                 ${this.loadingDirs
-                  ? html`<div class="dir-loading">加载中...</div>`
+                  ? html`<div class="dir-loading" style="min-height:40px;display:flex;align-items:center;justify-content:center">加载中...</div>`
                   : this.dirEntries.length === 0
                     ? html`<div class="dir-loading">No subdirectories</div>`
                     : this.dirEntries.map((d: DirEntry) => html`
