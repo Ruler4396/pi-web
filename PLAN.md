@@ -1,83 +1,76 @@
 # Pi Agent Web Server — 实施计划
 
-> **终极目标**: 将 opencode 完整生态（Web、提示词、Wiki、记忆、与 Hermes 的关联）迁移到 pi_rust 中。  
-> **中期目标**: pi-web 向 opencode web 靠拢，可用且好用。  
-> **当前阶段**: Phase 14 完成 — 三栏布局 + 文件树侧边栏 + 文件上传/下载/删除。
+> **终极目标**: 将 opencode 完整生态迁移到 pi_rust 中。
+> **中期目标**: pi-web 向 opencode web 靠拢，可用且好用。
+> **当前阶段**: Phase 19 完成 — 终端面板 + 语法高亮 + 文件标签 + 暗色模式
 
-## Phase 14：侧边栏 + 文件树 + 文件操作 ✅
+## 架构
 
-### 14.1 后端文件 API
-| 端点 | 用途 | 
-|------|------|
-| GET `/api/file/list?path=` | 列出目录 (JSON tree, 递归 2 层) |
-| GET `/api/file/read?path=` | 读取文件内容 |
-| GET `/api/file/download?path=` | 下载文件 (octet-stream) |
-| POST `/api/file/write` | 写入文件 `{path, content, encoding:"base64"}` |
-| POST `/api/file/delete` | 删除文件/目录 `{path}` |
+- **后端**: Rust axum，端口 3000，通过 stdin/stdout JSONL 与 pi binary 通信
+- **前端**: Lit + Vite SPA，使用 @earendil-works/pi-web-ui ChatPanel
+- **部署**: 8.138.1.39，nginx 反向代理 4443 端口 SSL
+- **CI**: GitHub Actions，每分钟 cron 自动部署
 
-### 14.2 前端组件
+## Phase 14-19：已完成
+
+### 14. 侧边栏 + 文件操作
+后端文件 API (list/read/download/write/delete)，前端 file-tree（可折叠懒加载）、file-upload（拖拽）、file-context-menu（右键），三栏布局可拖拽宽度。
+
+### 15. 键盘快捷键 + 斜杠命令
+slash-commands 8 命令面板，Ctrl+B/Escape/Ctrl+Enter/Ctrl+L 快捷键，session-stats 统计条，会话导出/归档/恢复。
+
+### 16. 暗色模式 + 会话归档
+暗色模式 CSS 变量完整体系，默认暗色，localStorage 持久化，归档/删除按钮。
+
+### 17. UI 精修
+对照 opencode web 设计令牌重构 CSS（box-shadow 边框替代 solid border、暖白背景 #f8f8f8、中灰文字 #6f6f6f）、欢迎屏、全局 emoji 替换为 SVG、目录选择器文件夹树导航。
+
+### 18. 文件标签 + 布局重构
+VSCode 风格文件标签（点击打开/再点关闭/多标签切换），三栏布局（侧边栏 | 标签面板 42% | 对话区 flex:1），预览语法高亮，面板宽度拖拽调节 3px handle。
+
+### 19. 终端面板
+后端 shell 执行 API `POST /api/shell/exec`，前端终端面板（顶栏按钮切换、底部 200px、命令输入 + stdout/stderr 输出、显示 cwd）。
+
+## Phase 20：修复中
+
+- Light-DOM 组件样式迁移到全局 CSS
+- 暗色模式编辑器卡片颜色覆盖
+- 预览区滚动条修复
+- 布局链高度修复
+
+## Phase 21（计划）：模型选择器
+
+- 模型选择器：先选厂商再选模型
+- 发送按钮 SVG 优化
+
+## API 端点
+
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/api/session` | GET/POST | 会话列表/创建(cwd) |
+| `/api/session/{id}` | GET/DELETE/PATCH | 会话详情/删除/更新 |
+| `/api/session/{id}/message` | GET/POST | 消息列表/发送(SSE) |
+| `/api/session/{id}/abort` | POST | 停止生成 |
+| `/api/session/{id}/export` | GET | 导出 Markdown |
+| `/api/session/{id}/archive` | POST | 归档 |
+| `/api/session/{id}/restore` | POST | 恢复 |
+| `/api/file/list` | GET | 列出目录(深度4) |
+| `/api/file/read` | GET | 读取文件内容 |
+| `/api/file/download` | GET | 下载文件 |
+| `/api/file/write` | POST | 写入文件(base64) |
+| `/api/file/delete` | POST | 删除文件/目录 |
+| `/api/shell/exec` | POST | 执行 shell 命令 |
+| `/api/models` | GET | 模型列表 |
+| `/api/event` | GET | SSE 事件流 |
+
+## 前端组件
+
 | 组件 | 文件 | 功能 |
 |------|------|------|
-| `file-tree` | `spa/src/components/file-tree.ts` | 可折叠目录树，emoji 图标，右键菜单事件 |
-| `file-context-menu` | `spa/src/components/file-context-menu.ts` | 右键菜单：打开/下载/复制路径/删除 |
-| `file-upload` | `spa/src/components/file-upload.ts` | 拖拽上传 + 文件选择器，base64 编码 |
-
-### 14.3 三栏布局
-- 侧边栏（可开关，Ctrl+B）：项目名称 + upload 按钮 + file-tree
-- 可拖拽调节宽度（resize-handle，180-500px）
-- 主聊天区（flex:1）
-
-### Playwright 验证
-```
-sidebar: true  fileTree: true  fileUpload: true
-toggleBtn: true  resizeHandle: true  topbar: true
-Errors: 0
-```
-
----
-
-## 下一步：Phase 15 — 键盘快捷键 + 斜杠命令 + UX 打磨
-
-### 15.1 键盘快捷键
-| 快捷键 | 功能 |
-|--------|------|
-| Ctrl+B | 切换侧边栏 |
-| Ctrl+N | 新建会话 |
-| Ctrl+L | 清空当前输入 |
-| Escape | 停止生成 |
-| Ctrl+Enter | 发送消息 |
-
-### 15.2 斜杠命令面板
-输入 `/` 触发：`/file` `/write` `/bash` `/search` `/clear` `/model` `/export` `/help`
-
-### 15.3 思考级别彩色 Badge
-顶栏显示当前思考级别，点击循环切换，颜色编码：off(灰) minimal(绿) low(蓝) medium(黄) high(橙) xhigh(红)
-
-### 15.4 会话统计条 + 导出
-- 消息数 / Token 用量 / 上下文使用率
-- 导出 Markdown
-
-### Phase 16：终端面板 + 归档 + 暗色模式
-- 底部终端面板
-- 会话归档/恢复
-- 暗色模式 toggle
-
----
-
-## Git 提交记录 (Phase 14)
-
-```
-9b6175a fix: three-panel layout with file tree sidebar - working
-118257f fix: three-panel layout render with file tree sidebar
-48cf398 feat: three-panel layout with file tree sidebar, context menu, drag-drop upload
-0bbbd50 feat: backend file API (list, read, download, write, delete)
-```
-
-
-### Phase 15: Slash Commands + Keyboard Shortcuts ✅ (2026-05-20)
-- ✅ slash-commands component — 8 commands, keyboard nav, auto-filter
-- ✅ session-stats — message count, model badge, thinking badge (color-coded)
-- ✅ Ctrl+B toggle sidebar, Escape abort, Ctrl+Enter send, Ctrl+L clear, / slash trigger
-- ✅ GET /api/session/:id/export — Markdown export
-- ✅ POST /api/session/:id/archive, restore
-- ✅ Playwright: 8/8 checks pass, 0 errors
+| `session-list` | pages/session-list.ts | 会话卡片列表 + 目录选择器 |
+| `session-chat` | pages/session-chat.ts | 聊天主界面（三栏+标签+终端） |
+| `file-tree` | components/file-tree.ts | 可折叠文件树（SVG+A扩展名+懒加载） |
+| `file-context-menu` | components/file-context-menu.ts | 右键菜单 |
+| `file-upload` | components/file-upload.ts | 文件上传 |
+| `slash-commands` | components/slash-commands.ts | 斜杠命令面板 |
+| `session-stats` | components/session-stats.ts | 会话统计条 |
