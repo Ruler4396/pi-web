@@ -620,3 +620,69 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
   to { opacity: 1; transform: translateY(0); }
 }
 [data-theme="dark"] .toast { background: #1e1e1e; }
+
+/* Slash badge */
+.slash-badge {
+  margin-left: auto; padding: 1px 5px; font-size: 9px; font-weight: 600;
+  border-radius: 3px; color: var(--accent); background: rgba(37,99,235,0.1);
+  letter-spacing: 0.03em;
+}
+/* Slash keyboard nav */
+.slash-item.selected {
+  background: rgba(37,99,235,0.06);
+  color: var(--accent);
+}
+[data-theme="dark"] .slash-item.selected { background: rgba(37,99,235,0.12); }
+
+/* Improved message rendering */
+/* Code blocks */
+message-list pre, streaming-message-container pre {
+  background: var(--bg-weak) !important;
+  border-radius: 6px !important;
+  padding: 12px 14px !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  overflow-x: auto !important;
+  box-shadow: 0 0 0 1px var(--border-color) !important;
+}
+message-list code, streaming-message-container code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace !important;
+  font-size: 13px !important;
+}
+/* Inline code */
+message-list p code, streaming-message-container p code {
+  padding: 1px 5px; border-radius: 3px;
+  background: var(--bg-weak); font-size: 12px;
+}
+/* Tool call cards */
+tool-call-card, [class*="tool-call"] {
+  border: none !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px var(--border-color) !important;
+  margin: 8px 0 !important;
+  overflow: hidden !important;
+}
+/* Thinking blocks */
+thinking-block {
+  border: none !important;
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 1px var(--border-color) !important;
+  margin: 8px 0 !important;
+}
+thinking-block .thinking-content {
+  padding: 10px 14px !important;
+  font-size: 12px !important;
+  color: var(--text-weaker) !important;
+}
+/* Message body text */
+message-list .message-body, streaming-message-container .message-body {
+  font-size: 14px !important; line-height: 1.65 !important;
+  color: var(--text-base) !important;
+}
+/* Dark mode overrides */
+[data-theme="dark"] message-list pre, [data-theme="dark"] streaming-message-container pre {
+  background: #1a1a1a !important; box-shadow: 0 0 0 1px rgba(255,255,255,0.06) !important;
+}
+[data-theme="dark"] message-list p code, [data-theme="dark"] streaming-message-container p code {
+  background: #2a2a2a !important;
+}

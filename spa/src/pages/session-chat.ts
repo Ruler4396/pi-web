@@ -49,7 +49,22 @@ export class SessionChat extends LitElement {
   @state() showAddModelDialog = false;
   @state() showSettings = false;
   @state() showShortcuts = false; @state() showConfig = false;
-  @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh" }; @state() showSlashCommands = false;
+  @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh" }; @state() showSlashCommands = false; @state() slashIdx = 0;
+  slashCommands = [
+    { cmd: "/help", desc: "显示快捷键", action: "ui" },
+    { cmd: "/clear", desc: "清空对话", action: "ui" },
+    { cmd: "/models", desc: "选择模型", action: "ui" },
+    { cmd: "/config", desc: "系统配置", action: "ui" },
+    { cmd: "/theme dark", desc: "暗色模式", action: "ui" },
+    { cmd: "/theme light", desc: "亮色模式", action: "ui" },
+    { cmd: "/keys", desc: "API 密钥", action: "ui" },
+    { cmd: "/init", desc: "初始化项目分析", action: "ai" },
+    { cmd: "/plan", desc: "制定实施计划", action: "ai" },
+    { cmd: "/goal", desc: "设定长期目标，自主迭代执行", action: "ai" },
+    { cmd: "/fork", desc: "分支对话", action: "ai" },
+    { cmd: "/compact", desc: "压缩上下文", action: "ai" },
+    { cmd: "/btw", desc: "临时提问，不污染对话", action: "ai" },
+  ];
   @state() toasts: {id: number, text: string, type: string}[] = []; contextTokens = 0; contextMax = 1048576; // DeepSeek V4 1M context
   @state() apiKeys: Record<string, string> = {};
   _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
