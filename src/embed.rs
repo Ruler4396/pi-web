@@ -5,16 +5,24 @@ use axum::{
 
 use std::path::PathBuf;
 
-const SPA_DIST: &str = "spa/dist";
+fn spa_dir() -> PathBuf {
+    std::env::var("PI_WEB_SPA_DIR").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("spa/dist"))
+}
 
 pub async fn spa_fallback(uri: axum::http::Uri) -> Response {
     let path = uri.path().trim_start_matches('/');
-    let base = PathBuf::from(SPA_DIST);
+    let base = spa_dir();
 
     let file_path = if path.is_empty() {
         base.join("index.html")
     } else {
-        base.join(path)
+        let p = base.join(path);
+        // Prevent directory traversal
+        if !p.starts_with(&base) {
+            base.join("index.html")
+        } else {
+            p
+        }
     };
 
     match tokio::fs::read(&file_path).await {
