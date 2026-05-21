@@ -210,6 +210,10 @@ export class SessionChat extends LitElement {
       if (this.agent) { this.agent.state.messages = []; }
       this.hasMessages = false; this.requestUpdate(); return;
     }
+    // Pass-through AI commands (sent to pi process)
+    if (["/fork", "/goal", "/plan", "/init", "/compact", "/btw"].some(x => c.startsWith(x))) {
+      return;
+    }
   }
 
   toggleShortcuts = () => { this.showShortcuts = !this.showShortcuts; this.requestUpdate(); };
@@ -277,7 +281,7 @@ export class SessionChat extends LitElement {
     const recentShown = new Set<string>();
     const parts: any[] = [];
     if (recents.length > 0) {
-      parts.push(html`<div class="model-section-title">Recent</div>`);
+      parts.push(html`<div class="model-section-title">最近使用</div>`);
       for (const r of recents.slice(0, 3)) {
         const key = r.provider + "/" + r.id;
         if (recentShown.has(key)) continue;
@@ -286,7 +290,7 @@ export class SessionChat extends LitElement {
       }
     }
     if (builtin.length > 0) {
-      parts.push(html`<div class="model-section-title">Built-in</div>`);
+      parts.push(html`<div class="model-section-title">内置模型</div>`);
       for (const m of builtin) {
         const key = m.provider + "/" + m.id;
         if (recentShown.has(key)) continue;
@@ -295,13 +299,13 @@ export class SessionChat extends LitElement {
       }
     }
     if (custom.length > 0) {
-      parts.push(html`<div class="model-section-title">Custom</div>`);
+      parts.push(html`<div class="model-section-title">自定义</div>`);
       for (const m of custom) {
-        parts.push(html`<div class="model-option${this.modelId === m.id && this.modelProvider === m.provider ? ' active' : ''}" @click=${() => this.selectModel(m.provider, m.id, m.label, m.thinking, m.builtin)}><span>${m.label}</span><span class="model-option-sub">${m.provider}</span><span class="model-delete-btn" @click=${(e: Event) => this.deleteCustomModel(m.provider, m.id, e)} title="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></div>`);
+        parts.push(html`<div class="model-option${this.modelId === m.id && this.modelProvider === m.provider ? ' active' : ''}" @click=${() => this.selectModel(m.provider, m.id, m.label, m.thinking, m.builtin)}><span>${m.label}</span><span class="model-option-sub">${m.provider}</span><span class="model-delete-btn" @click=${(e: Event) => this.deleteCustomModel(m.provider, m.id, e)} title="删除"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></div>`);
       }
     }
     parts.push(html`<div class="model-dropdown-divider"></div>`);
-    parts.push(html`<div class="model-option model-add-btn" @click=${this.openAddModel}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add model</div>`);
+    parts.push(html`<div class="model-option model-add-btn" @click=${this.openAddModel}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> 添加模型</div>`);
     return parts;
   }
 
@@ -583,7 +587,7 @@ export class SessionChat extends LitElement {
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
           <div style="flex:1"></div>
           ${this.modelSupportsThinking ? html`<div class="thinking-wrap" style="position:relative">
-            <button class="thinking-pill thinking-${this.thinkingLevel}" @click=${this.toggleThinkingMenu} title="Thinking: ${this.thinkingLevel}">
+            <button class="thinking-pill thinking-${this.thinkingLevel}" @click=${this.toggleThinkingMenu} title="思考: ${this.thinkingLevel}">
               <span class="thinking-dot"></span>
               <span class="thinking-label">${this.thinkingLevel === "off" ? "Off" : this.thinkingLevel.charAt(0).toUpperCase() + this.thinkingLevel.slice(1)}</span>
               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
@@ -591,14 +595,14 @@ export class SessionChat extends LitElement {
             ${this.showThinkingDropdown ? html`
               <div class="thinking-dropdown">
                 ${this.availableThinkingLevels.map(lvl => {
-                  const labels: Record<string, string> = { off: "Off", low: "Low", medium: "Medium", high: "High", max: "Max", xhigh: "XHigh" };
+                  const labels: Record<string, string> = { off: "关", low: "低", medium: "中", high: "高", max: "最大", xhigh: "XHigh" };
                   return html`<div class="model-option thinking-opt-${lvl} ${this.thinkingLevel === lvl ? "active" : ""}" @click=${() => this.setThinkingLevel(lvl)}>${labels[lvl] || lvl}</div>`;
                 })}
               </div>
             ` : ""}
           </div>` : ""}
           <div class="model-select-wrap" style="position:relative">
-            <button class="model-pill" @click=${this.toggleModelDropdown} title="Switch model">
+            <button class="model-pill" @click=${this.toggleModelDropdown} title="切换模型">
               <span class="model-pill-name">${this.modelLabel}</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
@@ -620,35 +624,35 @@ export class SessionChat extends LitElement {
               ? html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
               : html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`}
           </button>
-          <button class="theme-btn" @click=${this.toggleShortcuts} title="Shortcuts (? key)">
+          <button class="theme-btn" @click=${this.toggleShortcuts} title="快捷键 (?)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
           </button>
         </div>
         ${this.showShortcuts ? html`
           <div class="shortcuts-panel">
             <div class="shortcuts-header">
-              <span>Keyboard Shortcuts</span>
+              <span>键盘快捷键</span>
               <button class="shortcuts-close" @click=${() => { this.showShortcuts = false; this.requestUpdate(); }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
             <div class="shortcuts-body">
-              <div class="shortcuts-section">Global</div>
-              <div class="shortcut-row"><kbd>?</kbd><span>Toggle shortcuts</span></div>
-              <div class="shortcut-row"><kbd>Esc</kbd><span>Close dialog / dropdown</span></div>
-              <div class="shortcuts-section">Editor</div>
-              <div class="shortcut-row"><kbd>Enter</kbd><span>Send message</span></div>
-              <div class="shortcut-row"><kbd>Shift+Enter</kbd><span>New line</span></div>
-              <div class="shortcuts-section">Slash Commands</div>
-              <div class="shortcut-row"><kbd>/help</kbd><span>Show shortcuts</span></div>
-              <div class="shortcut-row"><kbd>/clear</kbd><span>Clear chat</span></div>
-              <div class="shortcut-row"><kbd>/models</kbd><span>Open model selector</span></div>
-              <div class="shortcut-row"><kbd>/theme dark|light</kbd><span>Switch theme</span></div>
-              <div class="shortcut-row"><kbd>/keys</kbd><span>Manage API keys</span></div>
-              <div class="shortcuts-section">Terminal</div>
-              <div class="shortcut-row"><kbd>Enter</kbd><span>Execute command</span></div>
-              <div class="shortcuts-section">Thinking</div>
-              <div class="shortcut-row"><kbd>Click</kbd><span>Cycle thinking level</span></div>
+              <div class="shortcuts-section">全局</div>
+              <div class="shortcut-row"><kbd>?</kbd><span>切换快捷键面板</span></div>
+              <div class="shortcut-row"><kbd>Esc</kbd><span>关闭对话框 / 下拉菜单</span></div>
+              <div class="shortcuts-section">编辑器</div>
+              <div class="shortcut-row"><kbd>Enter</kbd><span>发送消息</span></div>
+              <div class="shortcut-row"><kbd>Shift+Enter</kbd><span>换行</span></div>
+              <div class="shortcuts-section">斜杠命令</div>
+              <div class="shortcut-row"><kbd>/help</kbd><span>显示快捷键</span></div>
+              <div class="shortcut-row"><kbd>/clear</kbd><span>清空对话</span></div>
+              <div class="shortcut-row"><kbd>/models</kbd><span>打开模型选择</span></div>
+              <div class="shortcut-row"><kbd>/theme dark|light</kbd><span>切换主题</span></div>
+              <div class="shortcut-row"><kbd>/keys</kbd><span>管理 API 密钥</span></div>
+              <div class="shortcuts-section">终端</div>
+              <div class="shortcut-row"><kbd>Enter</kbd><span>执行命令</span></div>
+              <div class="shortcuts-section">思考</div>
+              <div class="shortcut-row"><kbd>Click</kbd><span>切换思考等级</span></div>
             </div>
           </div>
         ` : ""}
@@ -656,13 +660,13 @@ export class SessionChat extends LitElement {
           <div class="modal-overlay" @click=${() => { this.showSettings = false; this.requestUpdate(); }}></div>
           <div class="model-dialog" style="width:400px">
             <div class="model-dialog-header">
-              <span>API Keys</span>
+              <span>API 密钥</span>
               <button class="model-dialog-close" @click=${() => { this.showSettings = false; this.requestUpdate(); }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>
             <div class="model-dialog-body" style="max-height:60vh;overflow-y:auto">
-              ${Object.keys(this.apiKeys).length === 0 ? html`<div style="color:var(--text-weaker);font-size:13px;padding:20px 0;text-align:center">No API keys configured</div>` : ""}
+              ${Object.keys(this.apiKeys).length === 0 ? html`<div style="color:var(--text-weaker);font-size:13px;padding:20px 0;text-align:center">未配置 API 密钥</div>` : ""}
               ${Object.entries(this.apiKeys).map(([name, value]) => html`
                 <div class="model-dialog-row" style="align-items:flex-end">
                   <div class="model-dialog-field" style="flex:1">
@@ -676,12 +680,12 @@ export class SessionChat extends LitElement {
               `)}
               <div class="model-dialog-row" style="align-items:flex-end">
                 <div class="model-dialog-field" style="flex:1">
-                  <label>Add Key</label>
-                  <input type="text" placeholder="KEY_NAME" .value=${this._newKeyName || ""} @input=${(e: InputEvent) => { this._newKeyName = (e.target as HTMLInputElement).value; }}>
+                  <label>添加密钥</label>
+                  <input type="text" placeholder="密钥名称" .value=${this._newKeyName || ""} @input=${(e: InputEvent) => { this._newKeyName = (e.target as HTMLInputElement).value; }}>
                 </div>
                 <div class="model-dialog-field" style="flex:1">
                   <label>&nbsp;</label>
-                  <input type="password" placeholder="value" .value=${this._newKeyValue || ""} @input=${(e: InputEvent) => { this._newKeyValue = (e.target as HTMLInputElement).value; }}>
+                  <input type="password" placeholder="值" .value=${this._newKeyValue || ""} @input=${(e: InputEvent) => { this._newKeyValue = (e.target as HTMLInputElement).value; }}>
                 </div>
                 <button style="width:28px;height:28px;padding:4px;background:none;border:none;border-radius:4px;cursor:pointer;color:var(--accent);flex-shrink:0;margin-bottom:1px" @click=${() => { if (this._newKeyName) { this.apiKeys = { ...this.apiKeys, [this._newKeyName!]: this._newKeyValue || "" }; this._newKeyName = ""; this._newKeyValue = ""; this.requestUpdate(); } }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -689,9 +693,9 @@ export class SessionChat extends LitElement {
               </div>
             </div>
             <div class="model-dialog-footer">
-              <div style="font-size:11px;color:var(--text-weaker);flex:1;padding-top:4px">Keys stored in keys.json, injected as env vars to pi process</div>
-              <button class="model-dialog-cancel" @click=${() => { this.showSettings = false; this.requestUpdate(); }}>Cancel</button>
-              <button class="model-dialog-submit" @click=${this.saveApiKeys}>Save</button>
+              <div style="font-size:11px;color:var(--text-weaker);flex:1;padding-top:4px">密钥保存在 keys.json，注入为 pi 进程的环境变量</div>
+              <button class="model-dialog-cancel" @click=${() => { this.showSettings = false; this.requestUpdate(); }}>取消</button>
+              <button class="model-dialog-submit" @click=${this.saveApiKeys}>保存</button>
             </div>
           </div>
         ` : ""}
@@ -699,7 +703,7 @@ export class SessionChat extends LitElement {
           <div class="modal-overlay" @click=${this.closeAddModel}></div>
           <div class="model-dialog">
             <div class="model-dialog-header">
-              <span>Add Model</span>
+              <span>添加模型</span>
               <button class="model-dialog-close" @click=${this.closeAddModel}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -707,42 +711,42 @@ export class SessionChat extends LitElement {
             <div class="model-dialog-body">
               <div class="model-dialog-row">
                 <div class="model-dialog-field">
-                  <label>Provider ID</label>
-                  <input type="text" placeholder="e.g. openai" .value=${this.addModelForm.provider} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, provider: (e.target as HTMLInputElement).value }; }}>
+                  <label>厂商 ID</label>
+                  <input type="text" placeholder="例如 openai" .value=${this.addModelForm.provider} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, provider: (e.target as HTMLInputElement).value }; }}>
                 </div>
                 <div class="model-dialog-field">
-                  <label>Model ID</label>
-                  <input type="text" placeholder="e.g. gpt-4o" .value=${this.addModelForm.id} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, id: (e.target as HTMLInputElement).value }; }}>
+                  <label>模型 ID</label>
+                  <input type="text" placeholder="例如 gpt-4o" .value=${this.addModelForm.id} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, id: (e.target as HTMLInputElement).value }; }}>
                 </div>
               </div>
               <div class="model-dialog-row">
                 <div class="model-dialog-field">
-                  <label>Display Name</label>
-                  <input type="text" placeholder="e.g. GPT-4o" .value=${this.addModelForm.label} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, label: (e.target as HTMLInputElement).value }; }}>
+                  <label>显示名称</label>
+                  <input type="text" placeholder="例如 GPT-4o" .value=${this.addModelForm.label} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, label: (e.target as HTMLInputElement).value }; }}>
                 </div>
               </div>
               <div class="model-dialog-row">
                 <div class="model-dialog-field" style="flex:1">
-                  <label>API Key <span style="color:var(--text-weaker);font-weight:400">(optional)</span></label>
+                  <label>API 密钥 <span style="color:var(--text-weaker);font-weight:400">(可选)</span></label>
                   <input type="password" placeholder="sk-..." .value=${this.addModelForm.apiKey} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, apiKey: (e.target as HTMLInputElement).value }; }}>
                 </div>
               </div>
               <div class="model-dialog-row">
                 <div class="model-dialog-field" style="flex:1">
-                  <label>Base URL <span style="color:var(--text-weaker);font-weight:400">(optional)</span></label>
+                  <label>接口地址 <span style="color:var(--text-weaker);font-weight:400">(可选)</span></label>
                   <input type="text" placeholder="https://api.openai.com/v1" .value=${this.addModelForm.baseUrl} @input=${(e: InputEvent) => { this.addModelForm = { ...this.addModelForm, baseUrl: (e.target as HTMLInputElement).value }; }}>
                 </div>
               </div>
               <div class="model-dialog-row">
                 <label class="model-dialog-checkbox">
                   <input type="checkbox" .checked=${this.addModelForm.thinking} @change=${(e: Event) => { this.addModelForm = { ...this.addModelForm, thinking: (e.target as HTMLInputElement).checked }; }}>
-                  <span>Thinking / Reasoning support</span>
+                  <span>支持思考 / 推理</span>
                 </label>
               </div>
             </div>
             <div class="model-dialog-footer">
-              <button class="model-dialog-cancel" @click=${this.closeAddModel}>Cancel</button>
-              <button class="model-dialog-submit" @click=${this.submitAddModel} ?disabled=${!this.addModelForm.provider || !this.addModelForm.id || !this.addModelForm.label}>Add Model</button>
+              <button class="model-dialog-cancel" @click=${this.closeAddModel}>取消</button>
+              <button class="model-dialog-submit" @click=${this.submitAddModel} ?disabled=${!this.addModelForm.provider || !this.addModelForm.id || !this.addModelForm.label}>添加模型</button>
             </div>
           </div>
         ` : ""}
@@ -798,22 +802,41 @@ export class SessionChat extends LitElement {
             </div>
             <div class="slash-dropdown ${this.showSlashCommands ? 'active' : ''}">
               <div class="slash-item" @click=${() => { this.handleCommand('/help'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/help</span><span class="slash-desc">Show shortcuts</span>
+                <span class="slash-label">/help</span><span class="slash-desc">显示快捷键</span>
               </div>
               <div class="slash-item" @click=${() => { this.handleCommand('/clear'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/clear</span><span class="slash-desc">Clear chat</span>
+                <span class="slash-label">/clear</span><span class="slash-desc">清空对话</span>
               </div>
               <div class="slash-item" @click=${() => { this.handleCommand('/models'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/models</span><span class="slash-desc">Select model</span>
+                <span class="slash-label">/models</span><span class="slash-desc">选择模型</span>
               </div>
               <div class="slash-item" @click=${() => { this.handleCommand('/theme dark'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/theme dark</span><span class="slash-desc">Dark mode</span>
+                <span class="slash-label">/theme dark</span><span class="slash-desc">暗色模式</span>
               </div>
               <div class="slash-item" @click=${() => { this.handleCommand('/theme light'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/theme light</span><span class="slash-desc">Light mode</span>
+                <span class="slash-label">/theme light</span><span class="slash-desc">亮色模式</span>
               </div>
               <div class="slash-item" @click=${() => { this.handleCommand('/keys'); this.showSlashCommands = false; }}>
-                <span class="slash-label">/keys</span><span class="slash-desc">API keys</span>
+                <span class="slash-label">/keys</span><span class="slash-desc">API 密钥</span>
+              </div>
+              <div class="slash-section">AI 指令</div>
+              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
+                <span class="slash-label">/init</span><span class="slash-desc">初始化项目分析</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
+                <span class="slash-label">/plan</span><span class="slash-desc">制定实施计划</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
+                <span class="slash-label">/goal</span><span class="slash-desc">设定目标</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
+                <span class="slash-label">/fork</span><span class="slash-desc">分支对话</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
+                <span class="slash-label">/compact</span><span class="slash-desc">压缩上下文</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
+                <span class="slash-label">/btw</span><span class="slash-desc">旁注说明</span>
               </div>
             </div>
             ${this.chatPanel}

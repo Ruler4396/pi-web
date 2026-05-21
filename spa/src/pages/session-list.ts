@@ -190,15 +190,15 @@ export class SessionList extends LitElement {
       ${this.showDialog
         ? html`<div class="dialog-overlay" @click=${this.cancelDialog}>
             <div class="dialog" @click=${(e: Event) => e.stopPropagation()} @keydown=${this.handleDialogKeydown}>
-              <h3>New Session</h3>
-              <p class="hint">Choose a working directory for this session.</p>
+              <h3>新建会话</h3>
+              <p class="hint">选择此会话的工作目录</p>
               <div class="path-bar">
                 <button class="up-btn" @click=${this.navigateUp} title="Parent directory">${upSvg}</button>
                 <span class="path-text">${this.cwd}</span>
               </div>
               <div class="dir-list">
                 ${this.loadingDirs
-                  ? html`<div class="dir-loading">Loading...</div>`
+                  ? html`<div class="dir-loading">加载中...</div>`
                   : this.dirEntries.length === 0
                     ? html`<div class="dir-loading">No subdirectories</div>`
                     : this.dirEntries.map((d: DirEntry) => html`

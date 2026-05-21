@@ -584,3 +584,8 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 .slash-desc { font-size: 11px; color: var(--text-weaker); font-family: ui-sans-serif, system-ui, sans-serif; }
 [data-theme= dark] .slash-dropdown { background: #1e1e1e; }
 [data-theme=dark] .slash-item:hover { background: rgba(255,255,255,0.04); }
+.slash-section {
+  padding: 6px 14px 2px; font-size: 10px; font-weight: 600;
+  color: var(--text-weaker); text-transform: uppercase; letter-spacing: 0.05em;
+  border-top: 1px solid var(--border-color); margin-top: 4px;
+}
