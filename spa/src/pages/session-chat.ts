@@ -34,6 +34,11 @@ export class SessionChat extends LitElement {
   @state() showModelDropdown = false;
   @state() modelProvider = "deepseek"; @state() modelId = "deepseek-v4-flash"; @state() modelLabel = "DeepSeek V4 Flash";
   @state() thinkingLevel = "off";
+  get modelSupportsThinking(): boolean {
+    const models = (this.agent?.state as any)?.availableModels || [];
+    const cur = models.find((m: any) => m.id === this.modelId);
+    return cur?.thinking === true;
+  }
   @state() showAddModelDialog = false;
   @state() showSettings = false;
   @state() apiKeys: Record<string, string> = {};
@@ -541,7 +546,7 @@ export class SessionChat extends LitElement {
           <span class="divider">&#183;</span><span class="sid">${sid}</span>
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
           <div style="flex:1"></div>
-          <div class="thinking-wrap" style="position:relative">
+          ${this.modelSupportsThinking ? html`<div class="thinking-wrap" style="position:relative">
             <button class="thinking-pill thinking-${this.thinkingLevel}" @click=${this.toggleThinkingMenu} title="Thinking: ${this.thinkingLevel}">
               <span class="thinking-dot"></span>
               <span class="thinking-label">${this.thinkingLevel === "off" ? "Off" : this.thinkingLevel.charAt(0).toUpperCase() + this.thinkingLevel.slice(1)}</span>
@@ -557,7 +562,7 @@ export class SessionChat extends LitElement {
                 <div class="model-option thinking-opt-xhigh ${this.thinkingLevel === "xhigh" ? "active" : ""}" @click=${() => this.setThinkingLevel("xhigh")}>XHigh</div>
               </div>
             ` : ""}
-          </div>
+          </div>` : ""}
           <div class="model-select-wrap" style="position:relative">
             <button class="model-pill" @click=${this.toggleModelDropdown} title="Switch model">
               <span class="model-pill-name">${this.modelLabel}</span>
