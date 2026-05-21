@@ -34,14 +34,18 @@ export class SessionChat extends LitElement {
   @state() showModelDropdown = false;
   @state() modelProvider = "deepseek"; @state() modelId = "deepseek-v4-flash"; @state() modelLabel = "DeepSeek V4 Flash";
   @state() thinkingLevel = "off";
+  @state() availableThinkingLevels: string[] = ["off","low","medium","high","max"];
   get modelSupportsThinking(): boolean {
     const models = (this.agent?.state as any)?.availableModels || [];
     const cur = models.find((m: any) => m.id === this.modelId);
+    if (cur?.thinking && cur?.thinkingLevels?.length) {
+      this.availableThinkingLevels = cur.thinkingLevels;
+    }
     return cur?.thinking === true;
   }
   @state() showAddModelDialog = false;
   @state() showSettings = false;
-  @state() showShortcuts = false; contextTokens = 0; contextMax = 65536;
+  @state() showShortcuts = false; @state() showSlashCommands = false; contextTokens = 0; contextMax = 65536;
   @state() apiKeys: Record<string, string> = {};
   _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
@@ -192,8 +196,22 @@ export class SessionChat extends LitElement {
     this.thinkingLevel = level;
     this.showThinkingDropdown = false;
     if (this.agent) this.agent.setThinking(level).catch(() => {});
+    localStorage.setItem("pi-current-thinking", level);
     this.requestUpdate();
   };
+  handleCommand(cmd: string) {
+    var c = cmd.trim().toLowerCase();
+    if (c === "/help") { this.showShortcuts = true; this.requestUpdate(); return; }
+    if (c === "/keys" || c === "/settings") { this.toggleSettings(); return; }
+    if (c === "/models") { this.showModelDropdown = true; this.requestUpdate(); return; }
+    if (c === "/theme dark") { this.theme = "dark"; document.documentElement.dataset.theme = "dark"; localStorage.setItem("pi-theme", "dark"); this.requestUpdate(); return; }
+    if (c === "/theme light") { this.theme = ""; document.documentElement.dataset.theme = "light"; localStorage.setItem("pi-theme", "light"); this.requestUpdate(); return; }
+    if (c === "/clear") {
+      if (this.agent) { this.agent.state.messages = []; }
+      this.hasMessages = false; this.requestUpdate(); return;
+    }
+  }
+
   toggleShortcuts = () => { this.showShortcuts = !this.showShortcuts; this.requestUpdate(); };
 
   toggleSettings = async () => {
@@ -572,12 +590,10 @@ export class SessionChat extends LitElement {
             </button>
             ${this.showThinkingDropdown ? html`
               <div class="thinking-dropdown">
-                <div class="model-option thinking-opt-off ${this.thinkingLevel === "off" ? "active" : ""}" @click=${() => this.setThinkingLevel("off")}>Off</div>
-                <div class="model-option thinking-opt-low ${this.thinkingLevel === "low" ? "active" : ""}" @click=${() => this.setThinkingLevel("low")}>Low</div>
-                <div class="model-option thinking-opt-medium ${this.thinkingLevel === "medium" ? "active" : ""}" @click=${() => this.setThinkingLevel("medium")}>Medium</div>
-                <div class="model-option thinking-opt-high ${this.thinkingLevel === "high" ? "active" : ""}" @click=${() => this.setThinkingLevel("high")}>High</div>
-                <div class="model-option thinking-opt-max ${this.thinkingLevel === "max" ? "active" : ""}" @click=${() => this.setThinkingLevel("max")}>Max</div>
-                <div class="model-option thinking-opt-xhigh ${this.thinkingLevel === "xhigh" ? "active" : ""}" @click=${() => this.setThinkingLevel("xhigh")}>XHigh</div>
+                ${this.availableThinkingLevels.map(lvl => {
+                  const labels: Record<string, string> = { off: "Off", low: "Low", medium: "Medium", high: "High", max: "Max", xhigh: "XHigh" };
+                  return html`<div class="model-option thinking-opt-${lvl} ${this.thinkingLevel === lvl ? "active" : ""}" @click=${() => this.setThinkingLevel(lvl)}>${labels[lvl] || lvl}</div>`;
+                })}
               </div>
             ` : ""}
           </div>` : ""}
@@ -604,7 +620,38 @@ export class SessionChat extends LitElement {
               ? html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
               : html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`}
           </button>
+          <button class="theme-btn" @click=${this.toggleShortcuts} title="Shortcuts (? key)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </button>
         </div>
+        ${this.showShortcuts ? html`
+          <div class="shortcuts-panel">
+            <div class="shortcuts-header">
+              <span>Keyboard Shortcuts</span>
+              <button class="shortcuts-close" @click=${() => { this.showShortcuts = false; this.requestUpdate(); }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="shortcuts-body">
+              <div class="shortcuts-section">Global</div>
+              <div class="shortcut-row"><kbd>?</kbd><span>Toggle shortcuts</span></div>
+              <div class="shortcut-row"><kbd>Esc</kbd><span>Close dialog / dropdown</span></div>
+              <div class="shortcuts-section">Editor</div>
+              <div class="shortcut-row"><kbd>Enter</kbd><span>Send message</span></div>
+              <div class="shortcut-row"><kbd>Shift+Enter</kbd><span>New line</span></div>
+              <div class="shortcuts-section">Slash Commands</div>
+              <div class="shortcut-row"><kbd>/help</kbd><span>Show shortcuts</span></div>
+              <div class="shortcut-row"><kbd>/clear</kbd><span>Clear chat</span></div>
+              <div class="shortcut-row"><kbd>/models</kbd><span>Open model selector</span></div>
+              <div class="shortcut-row"><kbd>/theme dark|light</kbd><span>Switch theme</span></div>
+              <div class="shortcut-row"><kbd>/keys</kbd><span>Manage API keys</span></div>
+              <div class="shortcuts-section">Terminal</div>
+              <div class="shortcut-row"><kbd>Enter</kbd><span>Execute command</span></div>
+              <div class="shortcuts-section">Thinking</div>
+              <div class="shortcut-row"><kbd>Click</kbd><span>Cycle thinking level</span></div>
+            </div>
+          </div>
+        ` : ""}
         ${this.showSettings ? html`
           <div class="modal-overlay" @click=${() => { this.showSettings = false; this.requestUpdate(); }}></div>
           <div class="model-dialog" style="width:400px">
@@ -748,6 +795,26 @@ export class SessionChat extends LitElement {
             <div class="context-bar">
               <div class="context-bar-fill" style="width:${Math.min(100, this.contextTokens / this.contextMax * 100)}%"></div>
               <span class="context-bar-text">${this.contextTokens.toLocaleString()} / ${(this.contextMax/1000).toFixed(0)}k</span>
+            </div>
+            <div class="slash-dropdown ${this.showSlashCommands ? 'active' : ''}">
+              <div class="slash-item" @click=${() => { this.handleCommand('/help'); this.showSlashCommands = false; }}>
+                <span class="slash-label">/help</span><span class="slash-desc">Show shortcuts</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.handleCommand('/clear'); this.showSlashCommands = false; }}>
+                <span class="slash-label">/clear</span><span class="slash-desc">Clear chat</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.handleCommand('/models'); this.showSlashCommands = false; }}>
+                <span class="slash-label">/models</span><span class="slash-desc">Select model</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.handleCommand('/theme dark'); this.showSlashCommands = false; }}>
+                <span class="slash-label">/theme dark</span><span class="slash-desc">Dark mode</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.handleCommand('/theme light'); this.showSlashCommands = false; }}>
+                <span class="slash-label">/theme light</span><span class="slash-desc">Light mode</span>
+              </div>
+              <div class="slash-item" @click=${() => { this.handleCommand('/keys'); this.showSlashCommands = false; }}>
+                <span class="slash-label">/keys</span><span class="slash-desc">API keys</span>
+              </div>
             </div>
             ${this.chatPanel}
           </div>

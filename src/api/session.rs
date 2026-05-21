@@ -111,8 +111,8 @@ pub async fn save_keys(
 
 pub async fn models(State(state): State<AppState>) -> Result<Json<serde_json::Value>, StatusCode> {
     let builtin = vec![
-        serde_json::json!({"provider": "deepseek", "id": "deepseek-v4-flash", "label": "DeepSeek V4 Flash", "thinking": true, "builtin": true}),
-        serde_json::json!({"provider": "deepseek", "id": "deepseek-v4-pro", "label": "DeepSeek V4 Pro", "thinking": true, "builtin": true}),
+        serde_json::json!({"provider": "deepseek", "id": "deepseek-v4-flash", "label": "DeepSeek V4 Flash", "thinking": true, "builtin": true, "thinkingLevels": ["off","low","medium","high","max"]}),
+        serde_json::json!({"provider": "deepseek", "id": "deepseek-v4-pro", "label": "DeepSeek V4 Pro", "thinking": true, "builtin": true, "thinkingLevels": ["off","low","medium","high","max"]}),
     ];
     let mut models: Vec<serde_json::Value> = builtin;
     let custom_file = state.config.sessions_dir.join("models.json");
