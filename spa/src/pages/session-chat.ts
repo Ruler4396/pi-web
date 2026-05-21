@@ -30,11 +30,9 @@ export class SessionChat extends LitElement {
   @state() private theme: "dark" | "" = "dark";
   @state() private sessionCwd = "/root";
   @state() private hasMessages = false;
-  @state() private showTerminal = false;
-  @state() private terminalContent = "";
   @state() private tabs: FileTab[] = [];
   @state() private activeTab = 0;
-  @state() private tabPanelWidth = 42;
+  @state() tabPanelWidth = 42;
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
   private msgInterval = 0;
@@ -149,8 +147,6 @@ export class SessionChat extends LitElement {
     this.requestUpdate();
   };
 
-  toggleTerminal = () => { this.showTerminal = !this.showTerminal; this.requestUpdate(); };
-
   // Resize logic
   private onResizeStart = (e: MouseEvent) => {
     e.preventDefault();
@@ -199,11 +195,6 @@ export class SessionChat extends LitElement {
     if (e.dataTransfer?.files) this.dispatchEvent(new CustomEvent("file-drop", { detail: { files: e.dataTransfer.files }, bubbles: true, composed: true }));
   };
 
-  async runTerminalCommand(cmd: string, input: HTMLTextAreaElement) {
-    this.terminalContent += "$ " + cmd + "\n"; input.value = ""; this.requestUpdate();
-    this.terminalContent += "(backend shell not yet connected)\n"; this.requestUpdate();
-  }
-
   render() {
     if (this.error) {
       return html`<div class="error-wrap">
@@ -229,7 +220,6 @@ export class SessionChat extends LitElement {
           <span class="divider">&#183;</span><span class="sid">${sid}</span>
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
           <div style="flex:1"></div>
-          <button class="theme-btn" @click=${this.toggleTerminal} title="终端">></button>
           <button class="theme-btn" @click=${this.toggleTheme} title="${this.theme === 'dark' ? '亮色' : '暗色'}">
             ${this.theme === "dark"
               ? html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
@@ -286,25 +276,7 @@ export class SessionChat extends LitElement {
           </div>
         </div>
 
-        ${this.showTerminal ? html`
-          <div class="terminal-panel">
-            <div class="terminal-header">
-              <span class="terminal-title">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Terminal
-              </span>
-              <button class="close-btn" @click=${this.toggleTerminal}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            <div class="terminal-body">
-              <textarea class="terminal-input" placeholder="$ type a command..."
-                @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); const el = e.target as HTMLTextAreaElement; const cmd = el.value.trim(); if (cmd) this.runTerminalCommand(cmd, el); }
-                }}></textarea>
-              <pre class="terminal-output">${this.terminalContent}</pre>
-            </div>
-          </div>
-        ` : ""}
+
       </div>
     `;
   }

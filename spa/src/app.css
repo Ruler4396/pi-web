@@ -72,6 +72,14 @@ pi-chat-panel { flex: 1 !important; min-height: 0 !important; }
 /* ===== Chat wrapper ===== */
 .chat-wrapper { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
+/* Light-DOM host fix: ensure session-chat fills viewport */
+session-chat {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  min-height: 0 !important;
+}
+
 /* ===== Welcome ===== */
 .welcome { position: absolute; inset: 0 0 120px 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 0; }
 .welcome-inner { text-align: center; color: var(--text-weaker); }
@@ -139,7 +147,7 @@ message-editor .bg-card > div:last-child > div:last-child button { opacity: 0.5 
 message-editor .bg-card > div:last-child > div:last-child button:hover { opacity: 1 !important; color: var(--accent) !important; background: rgba(37,99,235,0.08) !important; }
 
 /* ===== Tab panel (VSCode-style file tabs) ===== */
-.tab-panel { background: var(--bg-base); overflow: hidden; min-height: 0; }
+.tab-panel { background: var(--bg-base); overflow: hidden; min-height: 0; width: 42%; }
 .tab-bar {
   display: flex; align-items: flex-end; gap: 0;
   background: var(--bg-weak); flex-shrink: 0;
