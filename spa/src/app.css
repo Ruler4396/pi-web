@@ -595,3 +595,28 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
   border-top: 1px solid var(--border-color); margin-top: 2px;
 }
 .model-dialog-section-title:first-child { border-top: none; margin-top: 0; }
+
+/* Toast notifications */
+.toast-container {
+  position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+  z-index: 80; display: flex; flex-direction: column; gap: 6px;
+  pointer-events: none;
+}
+.toast {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; font-size: 12px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  background: var(--surface-raised); border-radius: 8px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.1);
+  animation: toast-in 0.2s ease-out;
+  pointer-events: auto;
+}
+.toast-icon { font-size: 13px; }
+.toast-wikis { color: var(--text-base); }
+.toast-memory { color: var(--text-base); }
+.toast-hermes { color: var(--text-base); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+[data-theme="dark"] .toast { background: #1e1e1e; }

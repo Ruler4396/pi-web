@@ -46,7 +46,8 @@ export class SessionChat extends LitElement {
   @state() showAddModelDialog = false;
   @state() showSettings = false;
   @state() showShortcuts = false; @state() showConfig = false;
-  @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh" }; @state() showSlashCommands = false; contextTokens = 0; contextMax = 65536;
+  @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh" }; @state() showSlashCommands = false;
+  @state() toasts: {id: number, text: string, type: string}[] = []; contextTokens = 0; contextMax = 65536;
   @state() apiKeys: Record<string, string> = {};
   _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
@@ -200,6 +201,16 @@ export class SessionChat extends LitElement {
     localStorage.setItem("pi-current-thinking", level);
     this.requestUpdate();
   };
+  showToast(type: string, text: string) {
+    const id = Date.now();
+    this.toasts = [...this.toasts, { id, text, type }];
+    this.requestUpdate();
+    setTimeout(() => {
+      this.toasts = this.toasts.filter(t => t.id !== id);
+      this.requestUpdate();
+    }, 3500);
+  }
+
   handleCommand(cmd: string) {
     var c = cmd.trim().toLowerCase();
     if (c === "/help") { this.showShortcuts = true; this.requestUpdate(); return; }
