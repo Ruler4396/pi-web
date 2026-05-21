@@ -43,6 +43,10 @@ export class SessionChat extends LitElement {
   // Drag-drop tracking for file tree
   private dragCounter = 0;
   @state() private fileTreeDragging = false;
+  @state() private dropHintX = 0;
+  @state() private dropHintY = 0;
+  @state() private dropHintText = "";
+  @state() private dropTargetNode: string | null = null;
 
   static styles = css`
     :host { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -184,39 +188,55 @@ export class SessionChat extends LitElement {
     e.preventDefault();
     const sidebar = this.querySelector(".sidebar");
     if (sidebar && sidebar.contains(e.target as Node)) {
-      this.fileTreeDragging = true; this.requestUpdate();
-      // Auto-expand directory on hover
+      if (!this.fileTreeDragging) { this.fileTreeDragging = true; this.requestUpdate(); }
       const target = document.elementFromPoint(e.clientX, e.clientY);
-      if (target) {
-        const treeNode = target.closest(".tree-node");
-        if (treeNode) {
-          const icon = treeNode.querySelector(".icon svg");
-          const isFolder = icon && icon.outerHTML.includes("M22 19a2 2 0 0 1-2 2H4");
-          if (isFolder) {
-            clearTimeout(this.dragExpandTimer);
-            this.dragExpandTimer = window.setTimeout(() => {
-              const nodeName = treeNode.querySelector(".name")?.textContent?.trim();
-              if (nodeName) {
-                // Find the ft-drop-overlay path - try to expand via the file-tree
-                const ft = this.querySelector("file-tree") as any;
-                if (ft && ft.expanded) {
-                  const relPath = nodeName;
-                  if (!ft.expanded.has(relPath)) {
-                    // Trigger toggle by dispatching a click
-                    treeNode.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-                  }
-                }
-              }
-            }, 600);
-          }
-        }
+      const treeNode = target?.closest(".tree-node") as HTMLElement | null;
+      // Clear previous drop target
+      if (this.dropTargetNode) {
+        const prev = this.querySelector(".tree-node.drop-target");
+        if (prev) prev.classList.remove("drop-target");
+        this.dropTargetNode = null;
       }
+      if (treeNode) {
+        const name = treeNode.querySelector(".name")?.textContent?.trim() || "";
+        const icon = treeNode.querySelector(".icon svg");
+        const isFolder = icon && icon.outerHTML.indexOf("M22 19a2 2 0 0 1-2 2H4") > 0;
+        if (isFolder) {
+          treeNode.classList.add("drop-target");
+          this.dropTargetNode = name;
+          this.dropHintText = "释放到 " + name + " 目录"; // 释放到 X 目录
+          // Auto-expand on hover
+          clearTimeout(this.dragExpandTimer);
+          this.dragExpandTimer = window.setTimeout(() => {
+            if (!this.querySelector(".tree-node.drop-target")) return;
+            // Dispatch click to expand via file-tree toggle
+            treeNode.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+          }, 600);
+        } else {
+          this.dropHintText = "释放到当前目录"; // 释放到当前目录
+        }
+        const rect = treeNode.getBoundingClientRect();
+        this.dropHintX = rect.left;
+        this.dropHintY = rect.bottom + 4;
+      } else {
+        this.dropHintText = "拖放文件到此处上传"; // 拖放文件到此处上传
+        this.dropHintX = e.clientX;
+        this.dropHintY = e.clientY + 16;
+      }
+      this.requestUpdate();
+      clearTimeout(this.dragExpandTimer);
     }
   };
   private onGlobalDragLeave = (e: DragEvent) => {
     const sidebar = this.querySelector(".sidebar");
     if (sidebar && !sidebar.contains(e.relatedTarget as Node)) {
-      this.fileTreeDragging = false; this.requestUpdate();
+      this.fileTreeDragging = false;
+      if (this.dropTargetNode) {
+        const prev = this.querySelector(".tree-node.drop-target");
+        if (prev) prev.classList.remove("drop-target");
+        this.dropTargetNode = null;
+      }
+      this.requestUpdate();
     }
     clearTimeout(this.dragExpandTimer);
   };
@@ -224,7 +244,11 @@ export class SessionChat extends LitElement {
     e.preventDefault();
     this.fileTreeDragging = false; this.requestUpdate();
     clearTimeout(this.dragExpandTimer);
-    // Determine drop target directory
+    if (this.dropTargetNode) {
+      const prev = this.querySelector(".tree-node.drop-target");
+      if (prev) prev.classList.remove("drop-target");
+      this.dropTargetNode = null;
+    }
     const target = document.elementFromPoint(e.clientX, e.clientY);
     let dropCwd = this.sessionCwd;
     if (target) {
@@ -232,9 +256,8 @@ export class SessionChat extends LitElement {
       if (treeNode) {
         const name = treeNode.querySelector(".name")?.textContent?.trim();
         const icon = treeNode.querySelector(".icon svg");
-        const isFolder = icon && icon.outerHTML.includes("M22 19a2 2 0 0 1-2 2H4");
-        // If dropped on a folder, use that folder as target; if on file, use parent
-        dropCwd = this.sessionCwd + "/" + (isFolder ? name : "");
+        const isFolder = icon && icon.outerHTML.indexOf("M22 19a2 2 0 0 1-2 2H4") > 0;
+        dropCwd = this.sessionCwd.replace(/\/+$/, "") + "/" + (isFolder ? name : "");
       }
     }
     if (e.dataTransfer?.files) {
@@ -330,7 +353,8 @@ export class SessionChat extends LitElement {
               <file-upload></file-upload>
             </div>
             <file-tree rootpath=${this.sessionCwd} style="flex:1;overflow-y:auto;min-height:0;padding:4px 0"></file-tree>
-            <div class="ft-drop-overlay ${this.fileTreeDragging ? 'active' : ''}">拖放文件到此处上传</div>
+            <div class="ft-drop-overlay ${this.fileTreeDragging ? 'active' : ''}"></div>
+            <div class="ft-drop-hint ${this.fileTreeDragging ? 'active' : ''}" style="left:${this.dropHintX || 0}px;top:${this.dropHintY || 0}px">${this.dropHintText || '拖放文件到此处上传'}</div>
           </div>
 
           <!-- Tab panel -->

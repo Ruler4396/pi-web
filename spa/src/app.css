@@ -86,17 +86,71 @@ file-upload .upload-btn { display: inline-flex !important; align-items: center; 
 file-upload .upload-btn:hover { background: rgba(37,99,235,0.06) !important; color: #2563eb !important; border-color: rgba(37,99,235,0.3) !important; }
 file-upload .upload-btn.uploading { opacity: 0.4 !important; pointer-events: none !important; }
 
-/* Drag drop overlay with backdrop blur */
+/* ===== Session list (light DOM - global styles fix) ===== */
+session-list {
+  flex: 1; min-height: 0; display: flex; flex-direction: column;
+  overflow-y: auto; background: var(--bg-base);
+}
+session-list .container { max-width: 640px; width: 100%; margin: 0 auto; padding: 40px 20px; }
+session-list .hero { text-align: center; margin-bottom: 32px; }
+session-list .hero h1 { font-size: 24px; font-weight: 500; color: var(--text-strong); }
+session-list .hero p { font-size: 14px; color: var(--text-weak); }
+session-list .btn-new { display: inline-flex; align-items: center; gap: 6px; padding: 7px 20px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; }
+session-list .btn-new:hover { background: #1d4ed8; }
+session-list .session-list { display: flex; flex-direction: column; gap: 6px; }
+session-list .session-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface-raised); border-radius: 8px; cursor: pointer; box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04); }
+session-list .session-card:hover { box-shadow: 0 0 0 1px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.06); }
+session-list .session-icon { width: 36px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+session-list .session-body { flex: 1; min-width: 0; }
+session-list .session-title { font-size: 14px; font-weight: 500; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 2px; }
+session-list .session-sub { font-size: 12px; color: var(--text-weaker); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; }
+session-list .session-status { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 4px; flex-shrink: 0; }
+session-list .empty-state { text-align: center; padding: 48px 20px; }
+session-list .empty-state h2 { font-size: 16px; font-weight: 500; color: var(--text-strong); }
+session-list .empty-state p { font-size: 14px; color: var(--text-weak); }
+session-list .error-msg { background: #fef2f2; color: #b91c1c; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 16px; box-shadow: 0 0 0 1px rgba(220,38,38,0.15); }
+session-list .loading-wrap { display: flex; justify-content: center; padding: 40px; }
+session-list .btn-icon { width: 28px; height: 28px; border: none; background: transparent; color: var(--text-weaker); border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 0; opacity: 0.45; }
+session-list .session-card:hover .btn-icon { opacity: 1; }
+session-list .btn-icon:hover { background: var(--bg-weak); }
+session-list .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; }
+session-list .dialog { background: var(--surface-raised); border-radius: 10px; box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.12); padding: 24px; width: 420px; max-width: 90vw; max-height: 70vh; display: flex; flex-direction: column; }
+session-list .dialog h3 { font-size: 16px; font-weight: 500; color: var(--text-strong); }
+session-list .dialog .hint { font-size: 13px; color: var(--text-weak); margin: 0 0 16px; }
+session-list .path-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: var(--bg-base); border-radius: 6px; margin-bottom: 8px; font-size: 13px; font-family: ui-monospace, monospace; color: var(--text-strong); }
+session-list .path-bar .up-btn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: none; background: none; border-radius: 4px; cursor: pointer; color: var(--text-weak); padding: 0; flex-shrink: 0; }
+session-list .path-bar .up-btn:hover { background: rgba(0,0,0,0.06); color: var(--text-strong); }
+session-list .path-bar .path-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+session-list .dir-list { flex: 1; overflow-y: auto; min-height: 0; max-height: 280px; }
+session-list .dir-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; border-radius: 6px; font-size: 13px; color: var(--text-base); }
+session-list .dir-item:hover { background: rgba(0,0,0,0.04); }
+session-list .dialog-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+session-list .dialog-buttons button { padding: 6px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
+session-list .btn-confirm { background: #2563eb; color: #fff; }
+session-list .btn-confirm:hover { background: #1d4ed8; }
+
+/* ===== File tree ext badges ===== */
+.ext-badge { font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 3px; flex-shrink: 0; line-height: 15px; opacity: 0.9; }
+[data-theme="dark"] .ext-badge { opacity: 0.95; }
+
+/* Drag overlay: subtle border + node highlight, no full blur */
 .ft-drop-overlay {
   display: none; position: absolute; inset: 0; z-index: 10;
-  align-items: center; justify-content: center;
-  backdrop-filter: blur(6px);
-  background: rgba(0,0,0,0.2);
-  font-size: 14px; color: #fff; font-weight: 500;
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; pointer-events: none;
+  border: 2px dashed rgba(37,99,235,0.5);
+  background: transparent;
+  pointer-events: none;
 }
-[data-theme="dark"] .ft-drop-overlay { background: rgba(0,0,0,0.45); }
-.ft-drop-overlay.active { display: flex; }
+.ft-drop-overlay.active { display: block; }
+.ft-drop-hint {
+  display: none; position: absolute; z-index: 11;
+  padding: 4px 10px; background: rgba(0,0,0,0.75); color: #fff;
+  border-radius: 4px; font-size: 12px; font-family: ui-sans-serif, system-ui, sans-serif;
+  white-space: nowrap; pointer-events: none;
+}
+[data-theme="dark"] .ft-drop-hint { background: rgba(30,30,30,0.9); }
+.ft-drop-hint.active { display: block; }
+.tree-node.drop-target { background: rgba(37,99,235,0.1) !important; outline: 1px solid rgba(37,99,235,0.4); }
+[data-theme="dark"] .tree-node.drop-target { background: rgba(37,99,235,0.2) !important; }
 
 /* ===== Tab panel ===== */
 .tab-panel { background: var(--bg-base); overflow: hidden; min-height: 0; }

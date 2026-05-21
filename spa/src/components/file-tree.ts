@@ -115,7 +115,7 @@ export class FileTree extends LitElement {
     const ext = name.split(".").pop()?.toLowerCase() || "";
     if (!ext || ext === name) return html``;
     const color = extColors[ext] || "#6f6f6f";
-    return html`<span class="ext-badge" style="background:${color}15;color:${color}">${ext}</span>`;
+    return html`<span class="ext-badge" style="background:${color}40;color:${color}">${ext}</span>`;
   }
 
   private formatSize(bytes: number): string {
