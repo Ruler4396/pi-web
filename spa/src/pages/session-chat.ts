@@ -41,8 +41,9 @@ export class SessionChat extends LitElement {
   }
   @state() showAddModelDialog = false;
   @state() showSettings = false;
+  @state() showShortcuts = false;
   @state() apiKeys: Record<string, string> = {};
-  _newKeyName = ""; _newKeyValue = "";
+  _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
   @state() addModelForm = { provider: "", id: "", label: "", apiKey: "", baseUrl: "", thinking: false };
   @state() private terminalContent = "";
@@ -77,6 +78,20 @@ export class SessionChat extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
+    this._globalKeydown = (e: KeyboardEvent) => {
+      if (e.key === "?" && !e.ctrlKey && !e.metaKey && document.activeElement?.tagName !== "INPUT" && document.activeElement?.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        this.toggleShortcuts();
+      }
+      if (e.key === "Escape") {
+        if (this.showShortcuts) { this.showShortcuts = false; this.requestUpdate(); return; }
+        if (this.showSettings) { this.showSettings = false; this.requestUpdate(); return; }
+        if (this.showAddModelDialog) { this.showAddModelDialog = false; this.requestUpdate(); return; }
+        if (this.showModelDropdown) { this.showModelDropdown = false; this.requestUpdate(); return; }
+        if (this.showThinkingDropdown) { this.showThinkingDropdown = false; this.requestUpdate(); return; }
+      }
+    };
+    document.addEventListener("keydown", this._globalKeydown);
     const saved = localStorage.getItem(THEME_KEY);
     if (!saved || saved === "" || saved === "dark") {
       this.theme = "dark";
@@ -113,6 +128,7 @@ export class SessionChat extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    if (this._globalKeydown) document.removeEventListener("keydown", this._globalKeydown);
     clearInterval(this.msgInterval);
     this.chatPanel?.remove();
     this.chatPanel = undefined;
@@ -178,6 +194,8 @@ export class SessionChat extends LitElement {
     if (this.agent) this.agent.setThinking(level).catch(() => {});
     this.requestUpdate();
   };
+  toggleShortcuts = () => { this.showShortcuts = !this.showShortcuts; this.requestUpdate(); };
+
   toggleSettings = async () => {
     this.showSettings = !this.showSettings;
     if (this.showSettings) {

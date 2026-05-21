@@ -504,3 +504,45 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 /* Active overrides */
 .thinking-dropdown .model-option.active.thinking-opt-max { color: #a78bfa !important; }
 .thinking-dropdown .model-option.active.thinking-opt-xhigh { color: #f472b6 !important; }
+
+/* Shortcuts panel */
+.shortcuts-panel {
+  position: absolute; top: 32px; right: 40px; z-index: 50;
+  width: 320px; max-width: 90vw;
+  background: var(--surface-raised); border-radius: 10px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 8px 32px rgba(0,0,0,0.1);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  overflow: hidden;
+}
+.shortcuts-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px 8px; font-size: 12px; font-weight: 600;
+  color: var(--text-strong); border-bottom: 1px solid var(--border-color);
+}
+.shortcuts-close {
+  width: 22px; height: 22px; padding: 3px; background: none;
+  border: none; border-radius: 4px; cursor: pointer;
+  color: var(--text-weaker); display: flex; align-items: center; justify-content: center;
+}
+.shortcuts-close:hover { background: rgba(0,0,0,0.05); color: var(--text-base); }
+.shortcuts-body { padding: 6px 0; max-height: 360px; overflow-y: auto; }
+.shortcuts-section {
+  padding: 6px 14px 2px; font-size: 10px; font-weight: 600;
+  color: var(--text-weaker); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.shortcut-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 14px; font-size: 12px; color: var(--text-base);
+}
+.shortcut-row kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; padding: 1px 6px; font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-base); background: var(--bg-weak);
+  border: 1px solid var(--border-color); border-radius: 3px;
+  box-shadow: 0 1px 0 var(--border-color);
+}
+.shortcut-row span { color: var(--text-weak); flex: 1; }
+
+[data-theme= dark] .shortcuts-panel { background: #1e1e1e; }
+[data-theme=dark] .shortcut-row kbd { background: #2a2a2a; border-color: rgba(255,255,255,0.08); }
