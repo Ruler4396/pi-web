@@ -108,6 +108,10 @@ export class SessionChat extends LitElement {
         e.preventDefault();
         this.toggleShortcuts();
       }
+      if (e.key === "," && e.ctrlKey) {
+        e.preventDefault();
+        this.toggleConfig();
+      }
       if (e.key === "Escape") {
         if (this.showShortcuts) { this.showShortcuts = false; this.requestUpdate(); return; }
         if (this.showSettings) { this.showSettings = false; this.requestUpdate(); return; }
@@ -182,7 +186,9 @@ export class SessionChat extends LitElement {
 
     // Hook slash command on message editor textarea
     const installSlashHook = () => {
-      const editor = this.querySelector("message-editor");
+      // message-editor is inside ChatPanel's shadow DOM
+      const cp = this.chatPanel;
+      const editor = (cp as any)?.shadowRoot?.querySelector("message-editor") || this.querySelector("message-editor");
       if (!editor) { setTimeout(installSlashHook, 500); return; }
       const ta = (editor as any).shadowRoot?.querySelector("textarea") || editor.querySelector("textarea");
       if (!ta) { setTimeout(installSlashHook, 500); return; }
@@ -949,15 +955,25 @@ export class SessionChat extends LitElement {
                 </div>
               </div>
             ` : ""}
-            <div class="context-bar">
-              <div class="context-bar-fill" style="width:${Math.min(100, this.contextTokens / this.contextMax * 100)}%"></div>
-              <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.contextTokens.toLocaleString()} / ${(this.contextMax/1000).toFixed(0)}k</span>
+            <div class="context-bar" @click=${() => { this.showContextDetail = !this.showContextDetail; this.requestUpdate(); }}>
+              <div class="context-bar-fill ${this.contextTokens / this.contextMax > 0.8 ? 'ctx-warn' : ''}" style="width:${Math.min(100, this.contextTokens / this.contextMax * 100)}%"></div>
+              <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.contextTokens.toLocaleString()} / ${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</span>
+              ${this.showContextDetail ? html`
+                <div class="context-detail">
+                  <div class="ctx-detail-row"><span>已用 token</span><span>${this.contextTokens.toLocaleString()}</span></div>
+                  <div class="ctx-detail-row"><span>总量限制</span><span>${this.contextMax.toLocaleString()}</span></div>
+                  <div class="ctx-detail-row"><span>使用率</span><span>${(this.contextTokens / this.contextMax * 100).toFixed(1)}%</span></div>
+                  <div class="ctx-detail-row"><span>模型</span><span>${this.modelLabel}</span></div>
+                  <div class="ctx-detail-row"><span>估算方式</span><span>字符数 ÷ 3</span></div>
+                </div>
+              ` : ""}
             </div>
             <div class="slash-dropdown ${this.showSlashCommands ? 'active' : ''}">
               ${this.slashCommands.map((c, i) => html`
                 ${i === 7 ? html`<div class="slash-section">AI 指令</div>` : ""}
                 <div class="slash-item${i === this.slashIdx ? ' selected' : ''}" @click=${() => {
-                  const editor = this.querySelector("message-editor");
+                  const cp = this.chatPanel;
+                  const editor = (cp as any)?.shadowRoot?.querySelector("message-editor") || this.querySelector("message-editor");
                   const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea");
                   if (ta) { (ta as HTMLTextAreaElement).value = c.cmd + " "; ta.focus(); }
                   this.showSlashCommands = false;
