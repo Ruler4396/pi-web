@@ -5,3 +5,4 @@ pub mod session;
 pub mod v1;
 
 pub mod file;
+pub mod shell;

@@ -230,14 +230,25 @@ message-editor .bg-card > div:last-child > div:last-child button:hover { opacity
   flex: 1; display: flex; flex-direction: column; overflow: hidden;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
+.terminal-output-wrap {
+  flex: 1; overflow-y: auto; min-height: 0;
+}
+.terminal-input-wrap {
+  display: flex; align-items: center; border-top: 1px solid #333;
+  padding: 0; flex-shrink: 0;
+}
+.terminal-prompt {
+  color: #0f0; padding: 6px 8px; font-size: 13px; user-select: none;
+  font-family: inherit;
+}
 .terminal-input {
-  width: 100%; padding: 6px 10px; border: none; background: transparent;
-  color: #0f0; font-size: 13px; font-family: inherit;
-  outline: none; resize: none; flex-shrink: 0;
+  flex: 1; padding: 6px 4px; border: none; background: transparent;
+  color: #e0e0e0; font-size: 13px; font-family: inherit;
+  outline: none; resize: none;
 }
 .terminal-input::placeholder { color: #555; }
 .terminal-output {
-  flex: 1; margin: 0; padding: 0 10px 10px; font-size: 13px;
+  margin: 0; padding: 6px 10px; font-size: 13px;
   white-space: pre-wrap; overflow-y: auto; color: #ccc;
   background: transparent; font-family: inherit;
 }

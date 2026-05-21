@@ -30,6 +30,8 @@ export class SessionChat extends LitElement {
   @state() private theme: "dark" | "" = "dark";
   @state() private sessionCwd = "/root";
   @state() private hasMessages = false;
+  @state() private showTerminal = false;
+  @state() private terminalContent = "";
   @state() private tabs: FileTab[] = [];
   @state() private activeTab = 0;
   @state() tabPanelWidth = 42;
@@ -108,6 +110,8 @@ export class SessionChat extends LitElement {
     }, 500);
     this.requestUpdate();
   }
+
+  toggleTerminal = () => { this.showTerminal = !this.showTerminal; this.requestUpdate(); };
 
   private toggleTheme = () => {
     const next = this.theme === "dark" ? "" : "dark";
@@ -195,6 +199,30 @@ export class SessionChat extends LitElement {
     if (e.dataTransfer?.files) this.dispatchEvent(new CustomEvent("file-drop", { detail: { files: e.dataTransfer.files }, bubbles: true, composed: true }));
   };
 
+  async runTerminalCommand(cmd: string, input: HTMLTextAreaElement) {
+    this.terminalContent += "$ " + cmd + "\n";
+    input.value = "";
+    this.requestUpdate();
+    try {
+      const res = await fetch("/api/shell/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: cmd, cwd: this.sessionCwd }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.stdout) this.terminalContent += data.stdout;
+        if (data.stderr) this.terminalContent += data.stderr;
+        if (!data.stdout && !data.stderr) this.terminalContent += "(no output)\n";
+      } else {
+        this.terminalContent += "(command failed)\n";
+      }
+    } catch(e) {
+      this.terminalContent += "(error: " + e.message + ")\n";
+    }
+    this.requestUpdate();
+  }
+
   render() {
     if (this.error) {
       return html`<div class="error-wrap">
@@ -220,6 +248,9 @@ export class SessionChat extends LitElement {
           <span class="divider">&#183;</span><span class="sid">${sid}</span>
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
           <div style="flex:1"></div>
+          <button class="theme-btn" @click=${this.toggleTerminal} title="终端">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          </button>
           <button class="theme-btn" @click=${this.toggleTheme} title="${this.theme === 'dark' ? '亮色' : '暗色'}">
             ${this.theme === "dark"
               ? html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
