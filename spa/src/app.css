@@ -187,12 +187,24 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 .tab .tab-close:hover { background: rgba(0,0,0,0.1); color: var(--text-strong); }
 .tab-content { flex: 1 1 0px; min-height: 0; overflow: hidden; }
 .tab-content .preview-code {
-  width: 100%; height: 100%; margin: 0; padding: 14px 16px;
+  width: 100%; height: 100%; margin: 0; padding: 14px 0;
   font-size: 13px; line-height: 1.6;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   white-space: pre-wrap; overflow-wrap: break-word; word-break: break-all;
   color: var(--text-base); tab-size: 2; background: transparent;
   overflow-y: auto; overflow-x: hidden;
+  counter-reset: line;
+}
+.code-line {
+  display: block; padding: 0 16px;
+  min-height: 1.6em;
+}
+.code-line:hover { background: rgba(0,0,0,0.03); }
+[data-theme="dark"] .code-line:hover { background: rgba(255,255,255,0.03); }
+.line-num {
+  display: inline-block; width: 3em; margin-right: 1em;
+  text-align: right; color: var(--text-weaker);
+  user-select: none; flex-shrink: 0;
 }
 .preview-loading { display: block; padding: 16px; text-align: center; font-size: 13px; color: var(--text-weaker); font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
 .resize-handle { width: 4px; cursor: col-resize; flex-shrink: 0; background: transparent; transition: background 0.15s; }

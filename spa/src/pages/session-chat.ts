@@ -217,7 +217,7 @@ export class SessionChat extends LitElement {
       if (treeNode) {
         const name = treeNode.querySelector(".name")?.textContent?.trim() || "";
         const icon = treeNode.querySelector(".icon svg");
-        const isFolder = icon && icon.outerHTML.indexOf("M22 19a2 2 0 0 1-2 2H4") > 0;
+        const isFolder = icon && (icon.outerHTML.indexOf("M22 19a2 2 0 0 1-2 2H4") > 0 || icon.outerHTML.indexOf("M4 19.5A2.5") > 0);
         if (isFolder) {
           treeNode.classList.add("drop-target");
           this.dropTargetNode = name;
@@ -278,7 +278,7 @@ export class SessionChat extends LitElement {
       if (treeNode) {
         const name = treeNode.querySelector(".name")?.textContent?.trim();
         const icon = treeNode.querySelector(".icon svg");
-        const isFolder = icon && icon.outerHTML.indexOf("M22 19a2 2 0 0 1-2 2H4") > 0;
+        const isFolder = icon && (icon.outerHTML.indexOf("M22 19a2 2 0 0 1-2 2H4") > 0 || icon.outerHTML.indexOf("M4 19.5A2.5") > 0);
         dropCwd = this.sessionCwd.replace(/\/+$/, "") + "/" + (isFolder ? name : "");
       }
     }
@@ -374,6 +374,11 @@ export class SessionChat extends LitElement {
     this.requestUpdate();
   }
 
+  private addLineNumbers(html: string): string {
+    const lines = html.split("\n");
+    return lines.map((line, i) => '<span class="code-line"><span class="line-num">' + (i + 1) + '</span>' + line + '</span>').join("\n");
+  }
+
   render() {
     if (this.error) {
       return html`<div class="error-wrap">
@@ -437,7 +442,7 @@ export class SessionChat extends LitElement {
               </div>
               <div class="tab-content">
                 ${activeTabData ? html`
-                  <pre class="preview-code">${activeTabData.content ? unsafeHTML(highlightCode(activeTabData.content, activeTabData.name)) : html`<span class="preview-loading">Loading...</span>`}</pre>
+                  <pre class="preview-code">${activeTabData.content ? unsafeHTML(this.addLineNumbers(highlightCode(activeTabData.content, activeTabData.name))) : html`<span class="preview-loading">Loading...</span>`}</pre>
                 ` : ""}
               </div>
             </div>
