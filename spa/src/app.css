@@ -63,7 +63,7 @@ pi-chat-panel { flex: 1 !important; min-height: 0 !important; }
 }
 .model-section-title {
   padding: 5px 14px 3px; font-size: 10px; font-weight: 600;
-  color: var(--text-weaker); text-transform: uppercase;
+  color: var(--text-weaker) !important; text-transform: uppercase;
   letter-spacing: 0.05em; font-family: ui-sans-serif, system-ui, sans-serif;
 }
 .model-option {
@@ -367,7 +367,7 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 .model-dialog-close {
   width: 28px; height: 28px; padding: 4px; background: none;
   border: none; border-radius: 6px; cursor: pointer;
-  color: var(--text-weaker); display: flex; align-items: center; justify-content: center;
+  color: var(--text-weaker) !important; display: flex; align-items: center; justify-content: center;
 }
 .model-dialog-close:hover { background: rgba(0,0,0,0.06); color: var(--text-base); }
 .model-dialog-body {
@@ -443,3 +443,50 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 .thinking-label { min-width: 20px; text-align: center; }
 [data-theme= dark] .thinking-pill { background: rgba(37,99,235,0.12); }
 [data-theme=dark] .thinking-pill:hover { background: rgba(37,99,235,0.2); }
+
+/* Thinking pill v2 - per-level colors */
+.thinking-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px 2px 5px; font-size: 10px; font-weight: 600;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  border: none; border-radius: 5px; cursor: pointer;
+  transition: all 0.12s; white-space: nowrap;
+  background: transparent;
+}
+.thinking-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+/* off */
+.thinking-off { color: var(--text-weaker); }
+.thinking-off .thinking-dot { background: var(--text-weaker); }
+.thinking-off:hover { background: rgba(255,255,255,0.04); }
+/* low - emerald */
+.thinking-low { color: #34d399; }
+.thinking-low .thinking-dot { background: #34d399; }
+.thinking-low:hover { background: rgba(52,211,153,0.1); }
+/* medium - amber */
+.thinking-medium { color: #fbbf24; }
+.thinking-medium .thinking-dot { background: #fbbf24; }
+.thinking-medium:hover { background: rgba(251,191,36,0.1); }
+/* high - rose */
+.thinking-high { color: #fb7185; }
+.thinking-high .thinking-dot { background: #fb7185; }
+.thinking-high:hover { background: rgba(251,113,133,0.1); }
+
+.thinking-label { font-size: 10px; }
+.thinking-dropdown {
+  position: absolute; top: 100%; left: 0; margin-top: 4px;
+  background: var(--surface-raised); border-radius: 8px;
+  padding: 4px 0; min-width: 100px; z-index: 50;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.12);
+}
+.thinking-opt-off { color: var(--text-weaker); }
+.thinking-opt-low { color: #34d399; }
+.thinking-opt-medium { color: #fbbf24; }
+.thinking-opt-high { color: #fb7185; }
+[data-theme= dark] .thinking-dropdown { background: #1e1e1e; }
+[data-theme=dark] .thinking-off:hover { background: rgba(255,255,255,0.04); }
+.thinking-dropdown .model-option.active.thinking-opt-off { color: var(--text-weaker) !important; }
+.thinking-dropdown .model-option.active.thinking-opt-low { color: #34d399 !important; }
+.thinking-dropdown .model-option.active.thinking-opt-medium { color: #fbbf24 !important; }
+.thinking-dropdown .model-option.active.thinking-opt-high { color: #fb7185 !important; }

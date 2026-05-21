@@ -32,7 +32,7 @@ export class SessionChat extends LitElement {
   @state() private hasMessages = false;
     @state() showTerminal = false;
   @state() showModelDropdown = false;
-  @state() modelProvider = "deepseek"; @state() modelId = "deepseek-chat"; @state() modelLabel = "DeepSeek V4 Chat";
+  @state() modelProvider = "deepseek"; @state() modelId = "deepseek-v4-flash"; @state() modelLabel = "DeepSeek V4 Flash";
   @state() thinkingLevel = "off";
   @state() showAddModelDialog = false;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
@@ -141,7 +141,6 @@ export class SessionChat extends LitElement {
   toggleModelDropdown = () => { this.showModelDropdown = !this.showModelDropdown; this.requestUpdate(); };
   selectModel = (provider: string, id: string, label: string, thinking: boolean, builtin: boolean) => {
     this.modelProvider = provider; this.modelId = id; this.modelLabel = label;
-    this.thinkingLevel = thinking ? "high" : "off";
     this.showModelDropdown = false;
     if (this.agent) {
       this.agent.setModel(provider, id).catch(() => {});
@@ -163,15 +162,11 @@ export class SessionChat extends LitElement {
       .then(() => { this.loadModels(); this.requestUpdate(); })
       .catch(() => {});
   };
-  toggleThinking = () => {
-    const levels = ["off", "low", "medium", "high"];
-    const idx = levels.indexOf(this.thinkingLevel);
-    this.thinkingLevel = levels[(idx + 1) % levels.length];
-    if (this.agent) this.agent.setThinking(this.thinkingLevel).catch(() => {});
-    this.requestUpdate();
-  };
+  @state() showThinkingDropdown = false;
+  toggleThinkingMenu = () => { this.showThinkingDropdown = !this.showThinkingDropdown; this.requestUpdate(); };
   setThinkingLevel = (level: string) => {
     this.thinkingLevel = level;
+    this.showThinkingDropdown = false;
     if (this.agent) this.agent.setThinking(level).catch(() => {});
     this.requestUpdate();
   };
@@ -523,9 +518,20 @@ export class SessionChat extends LitElement {
           <span class="divider">&#183;</span><span class="sid">${sid}</span>
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
           <div style="flex:1"></div>
-          <div class="thinking-pill" @click=${this.toggleThinking} title="Thinking: ${this.thinkingLevel}">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            <span class="thinking-label">${this.thinkingLevel}</span>
+          <div class="thinking-wrap" style="position:relative">
+            <button class="thinking-pill thinking-${this.thinkingLevel}" @click=${this.toggleThinkingMenu} title="Thinking: ${this.thinkingLevel}">
+              <span class="thinking-dot"></span>
+              <span class="thinking-label">${this.thinkingLevel === "off" ? "Off" : this.thinkingLevel.charAt(0).toUpperCase() + this.thinkingLevel.slice(1)}</span>
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            ${this.showThinkingDropdown ? html`
+              <div class="thinking-dropdown">
+                <div class="model-option thinking-opt-off ${this.thinkingLevel === "off" ? "active" : ""}" @click=${() => this.setThinkingLevel("off")}>Off</div>
+                <div class="model-option thinking-opt-low ${this.thinkingLevel === "low" ? "active" : ""}" @click=${() => this.setThinkingLevel("low")}>Low</div>
+                <div class="model-option thinking-opt-medium ${this.thinkingLevel === "medium" ? "active" : ""}" @click=${() => this.setThinkingLevel("medium")}>Medium</div>
+                <div class="model-option thinking-opt-high ${this.thinkingLevel === "high" ? "active" : ""}" @click=${() => this.setThinkingLevel("high")}>High</div>
+              </div>
+            ` : ""}
           </div>
           <div class="model-select-wrap" style="position:relative">
             <button class="model-pill" @click=${this.toggleModelDropdown} title="Switch model">
