@@ -63,7 +63,7 @@ export class HttpAgent {
       const res = await fetch(`/api/session/${this.sessionId}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageText }),
+        body: JSON.stringify({ message: messageText, thinkingLevel: this._state.thinkingLevel || "off" }),
         signal,
       });
 
@@ -77,6 +77,8 @@ export class HttpAgent {
       let buffer = "";
       let currentAssistantContent = "";
       let messageSent = false;
+    let currentThinkingContent = "";
+    let currentContentBlocks = [] as any[];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -102,11 +104,12 @@ export class HttpAgent {
 
                 messageSent = true;
                 currentAssistantContent = "";
+
                 const msg: any = {
                   id: raw.message?.id || crypto.randomUUID(),
                   sessionID: this.sessionId,
                   role: "assistant",
-                  content: [{ type: "text", text: "" }] as any[],
+                  content: currentContentBlocks,
                   stopReason: null,
                 };
                 this._state.addMessage(msg);
@@ -115,21 +118,46 @@ export class HttpAgent {
               }
               case "message_update": {
                 const deltaEvent = raw.assistantMessageEvent || {};
-                const delta = deltaEvent.delta || deltaEvent.text || "";
-                if (delta) {
-                  currentAssistantContent += delta;
-                  if (this._state.messages.length > 0) {
-                    const lastMsg = this._state.messages[this._state.messages.length - 1] as any;
-                    // Content must be an array of {type, text} chunks for ChatPanel
-                    lastMsg.content = [{ type: "text", text: currentAssistantContent }];
-                  }
+                const deltaType = deltaEvent.type || "";
+                const deltaText = deltaEvent.delta || deltaEvent.text || "";
+                const thinkingText = deltaEvent.thinkingDelta || deltaEvent.thinking || "";
+                const reasoningText = deltaEvent.reasoningDelta || deltaEvent.reasoning || "";
+
+                let chunkUpdated = false;
+                const lastMsg = this._state.messages[this._state.messages.length - 1] as any;
+
+                // Handle thinking/reasoning content
+                if (thinkingText || reasoningText) {
+                  const think = thinkingText || reasoningText;
+                  currentThinkingContent += think;
+                  chunkUpdated = true;
                 }
-                const updateMsg = this._state.messages[this._state.messages.length - 1] || { role: "assistant", content: [{ type: "text", text: currentAssistantContent }] };
+
+                // Handle text content
+                if (deltaText) {
+                  currentAssistantContent += deltaText;
+                  chunkUpdated = true;
+                }
+
+                // Build content blocks for ChatPanel (supports ThinkingBlock)
+                if (chunkUpdated && lastMsg) {
+                  const blocks: any[] = [];
+                  if (currentThinkingContent) {
+                    blocks.push({ type: "thinking", thinking: currentThinkingContent });
+                  }
+                  if (currentAssistantContent || (!currentThinkingContent && deltaText)) {
+                    blocks.push({ type: "text", text: currentAssistantContent || deltaText });
+                  }
+                  lastMsg.content = blocks.length > 0 ? blocks : [{ type: "text", text: "" }];
+                }
+
+                const updateMsg = lastMsg || { role: "assistant", content: [{ type: "text", text: currentAssistantContent }] };
                 await this.emit({
                   type: "message_update",
                   message: updateMsg,
-                  text: delta || currentAssistantContent,
-                  delta: delta || currentAssistantContent,
+                  text: deltaText || currentAssistantContent,
+                  delta: deltaText || currentAssistantContent,
+                  thinkingDelta: thinkingText || reasoningText || "",
                   content: currentAssistantContent,
                   assistantMessageEvent: deltaEvent,
                 } as any);
@@ -154,6 +182,15 @@ export class HttpAgent {
                   args: raw.args || {},
                 });
                 break;
+              case "tool_execution_update":
+                await this.emit({
+                  type: "tool_execution_update",
+                  toolCallId: raw.toolCallId || raw.tool_call_id || "",
+                  toolName: raw.toolName || raw.tool_name || "",
+                  partialResult: raw.partialResult || raw.partial_result || null, args: {},
+
+                });
+                break;
               case "tool_execution_end":
                 this._state.pendingToolCalls.delete(raw.toolCallId || raw.tool_call_id || "");
                 await this.emit({
@@ -176,6 +213,46 @@ export class HttpAgent {
               case "error":
                 this._state.errorMessage = raw.error || "Unknown error";
                 await this.emit({ type: "error" } as any);
+                break;
+              case "wiki_result":
+                await this.emit({
+                  type: "wiki_result",
+                  query: raw.query || "",
+                  results: raw.results || [],
+                  total: raw.total || 0,
+                } as any);
+                break;
+              case "memory_result":
+                await this.emit({
+                  type: "memory_result",
+                  query: raw.query || "",
+                  memories: raw.memories || [],
+                } as any);
+                break;
+              case "hermes_event":
+                await this.emit({
+                  type: "hermes_event",
+                  platform: raw.platform || "",
+                  event: raw.event || "",
+                  fromUser: raw.fromUser || raw.from_user || "",
+                  message: raw.message || "",
+                } as any);
+                break;
+              case "prompt_chain_event":
+                await this.emit({
+                  type: "prompt_chain_event",
+                  chainName: raw.chainName || raw.chain_name || "",
+                  step: raw.step || 0,
+                  status: raw.status || "",
+                } as any);
+                break;
+              case "auto_compaction_start":
+                break;
+              case "auto_compaction_end":
+                break;
+              case "auto_retry_start":
+                break;
+              case "auto_retry_end":
                 break;
             }
           } catch { }
@@ -255,6 +332,7 @@ export class HttpAgent {
 class HttpAgentState implements AgentState {
   systemPrompt = "You are a helpful AI assistant. Use tools when appropriate to read, write, edit files and run commands.";
   thinkingLevel: ThinkingLevel = "off";
+  currentThinkingContent = "";
   private _tools: any[] = [
     { name: "read_file", description: "Read file contents", parameters: {}, label: "Read File", execute: async () => ({}) },
     { name: "write_file", description: "Write file contents", parameters: {}, label: "Write File", execute: async () => ({}) },

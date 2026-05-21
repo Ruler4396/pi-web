@@ -49,8 +49,10 @@ pub async fn send(
     let agent = state.sessions.get_or_create(&id).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     let message = body["message"].as_str().unwrap_or_default().to_string();
+    let thinking_level = body["thinkingLevel"].as_str().unwrap_or("off");
     let mut rx = agent.subscribe();
-    let cmd = RpcCommand::prompt(&message);
+    let mut cmd = RpcCommand::prompt(&message);
+    cmd.extra = serde_json::json!({"thinkingLevel": thinking_level});
     agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let stream = async_stream::stream! {
         loop {
@@ -67,6 +69,14 @@ pub async fn send(
                         crate::pi::protocol::AgentEvent::ToolExecutionUpdate { .. } => "tool_update",
                         crate::pi::protocol::AgentEvent::ToolExecutionEnd { .. } => "tool_end",
                         crate::pi::protocol::AgentEvent::Error { .. } => "error",
+                        crate::pi::protocol::AgentEvent::WikiResult { .. } => "wiki_result",
+                        crate::pi::protocol::AgentEvent::MemoryResult { .. } => "memory_result",
+                        crate::pi::protocol::AgentEvent::HermesEvent { .. } => "hermes_event",
+                        crate::pi::protocol::AgentEvent::PromptChainEvent { .. } => "prompt_chain_event",
+                        crate::pi::protocol::AgentEvent::AutoCompactionStart { .. } => "auto_compaction_start",
+                        crate::pi::protocol::AgentEvent::AutoCompactionEnd { .. } => "auto_compaction_end",
+                        crate::pi::protocol::AgentEvent::AutoRetryStart { .. } => "auto_retry_start",
+                        crate::pi::protocol::AgentEvent::AutoRetryEnd { .. } => "auto_retry_end",
                         _ => continue,
                     };
                     yield Ok(Event::default().event(event_type).data(json));
