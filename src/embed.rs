@@ -12,10 +12,10 @@ pub struct SpaAssets;
 pub async fn spa_fallback(uri: axum::http::Uri) -> Response {
     let path = uri.path().trim_start_matches('/');
 
-    let file = if path.is_empty() {
-        <SpaAssets as RustEmbed>::get("index.html")
+    let file: Option<rust_embed::EmbeddedFile> = if path.is_empty() {
+        SpaAssets::get("index.html")
     } else {
-        <SpaAssets as RustEmbed>::get(path)
+        SpaAssets::get(path)
     };
 
     match file {
@@ -27,7 +27,7 @@ pub async fn spa_fallback(uri: axum::http::Uri) -> Response {
                 .body(axum::body::Body::from(content.data))
                 .unwrap()
         }
-        None => <SpaAssets as RustEmbed>::get("index.html")
+        None => SpaAssets::get("index.html")
             .map(|content| {
                 Response::builder()
                     .status(StatusCode::OK)
