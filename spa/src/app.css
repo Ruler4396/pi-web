@@ -589,3 +589,9 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
   color: var(--text-weaker); text-transform: uppercase; letter-spacing: 0.05em;
   border-top: 1px solid var(--border-color); margin-top: 4px;
 }
+.model-dialog-section-title {
+  padding: 8px 0 4px; font-size: 10px; font-weight: 600;
+  color: var(--text-weaker); text-transform: uppercase; letter-spacing: 0.05em;
+  border-top: 1px solid var(--border-color); margin-top: 2px;
+}
+.model-dialog-section-title:first-child { border-top: none; margin-top: 0; }

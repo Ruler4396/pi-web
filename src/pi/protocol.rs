@@ -80,6 +80,86 @@ impl RpcCommand {
             extra: Value::Object(Default::default()),
         }
     }
+
+    // === Memory commands ===
+    pub fn memory_store(key: &str, value: &str, session_id: Option<&str>) -> Self {
+        let mut extra = serde_json::json!({"key": key, "value": value});
+        if let Some(sid) = session_id {
+            extra["sessionId"] = serde_json::Value::String(sid.into());
+        }
+        Self { command_type: "memory_store".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: session_id.map(|s| s.into()), extra }
+    }
+    pub fn memory_recall(query: &str, limit: Option<u32>) -> Self {
+        let mut extra = serde_json::json!({"query": query});
+        if let Some(l) = limit { extra["limit"] = serde_json::Value::Number(l.into()); }
+        Self { command_type: "memory_recall".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
+    }
+    pub fn memory_forget(id: &str) -> Self {
+        Self { command_type: "memory_forget".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra: serde_json::json!({"id": id}) }
+    }
+    pub fn memory_list(session_id: Option<&str>, limit: Option<u32>) -> Self {
+        let mut extra = serde_json::json!({});
+        if let Some(sid) = session_id { extra["sessionId"] = serde_json::Value::String(sid.into()); }
+        if let Some(l) = limit { extra["limit"] = serde_json::Value::Number(l.into()); }
+        Self { command_type: "memory_list".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: session_id.map(|s| s.into()), extra }
+    }
+
+    // === Wiki commands ===
+    pub fn wiki_search(query: &str, limit: Option<u32>) -> Self {
+        let mut extra = serde_json::json!({"query": query});
+        if let Some(l) = limit { extra["limit"] = serde_json::Value::Number(l.into()); }
+        Self { command_type: "wiki_search".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
+    }
+    pub fn wiki_get(id: &str) -> Self {
+        Self { command_type: "wiki_get".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra: serde_json::json!({"id": id}) }
+    }
+    pub fn wiki_add(title: &str, content: &str, tags: Option<&[String]>, source: Option<&str>) -> Self {
+        let mut extra = serde_json::json!({"title": title, "content": content});
+        if let Some(t) = tags { extra["tags"] = serde_json::Value::Array(t.iter().map(|s| serde_json::Value::String(s.clone())).collect()); }
+        if let Some(s) = source { extra["source"] = serde_json::Value::String(s.into()); }
+        Self { command_type: "wiki_add".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
+    }
+    pub fn wiki_update(id: &str, title: Option<&str>, content: Option<&str>, tags: Option<&[String]>) -> Self {
+        let mut extra = serde_json::json!({"id": id});
+        if let Some(t) = title { extra["title"] = serde_json::Value::String(t.into()); }
+        if let Some(c) = content { extra["content"] = serde_json::Value::String(c.into()); }
+        if let Some(t) = tags { extra["tags"] = serde_json::Value::Array(t.iter().map(|s| serde_json::Value::String(s.clone())).collect()); }
+        Self { command_type: "wiki_update".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
+    }
+    pub fn wiki_delete(id: &str) -> Self {
+        Self { command_type: "wiki_delete".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra: serde_json::json!({"id": id}) }
+    }
+    pub fn wiki_list(offset: Option<u32>, limit: Option<u32>, tag: Option<&str>) -> Self {
+        let mut extra = serde_json::json!({});
+        if let Some(o) = offset { extra["offset"] = serde_json::Value::Number(o.into()); }
+        if let Some(l) = limit { extra["limit"] = serde_json::Value::Number(l.into()); }
+        if let Some(t) = tag { extra["tag"] = serde_json::Value::String(t.into()); }
+        Self { command_type: "wiki_list".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
+    }
+
+    // === Prompt commands ===
+    pub fn prompt_list() -> Self {
+        Self { command_type: "prompt_list".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra: Value::Object(Default::default()) }
+    }
+    pub fn prompt_set(name: &str) -> Self {
+        Self { command_type: "prompt_set".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra: serde_json::json!({"name": name}) }
+    }
+    pub fn prompt_get(name: &str) -> Self {
+        Self { command_type: "prompt_get".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra: serde_json::json!({"name": name}) }
+    }
+
+    // === Hermes commands ===
+    pub fn hermes_status() -> Self {
+        Self { command_type: "hermes_status".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra: Value::Object(Default::default()) }
+    }
+    pub fn hermes_configure(platform: &str, enabled: Option<bool>, token: Option<&str>, app_id: Option<&str>, app_secret: Option<&str>) -> Self {
+        let mut extra = serde_json::json!({"platform": platform});
+        if let Some(e) = enabled { extra["enabled"] = serde_json::Value::Bool(e); }
+        if let Some(t) = token { extra["token"] = serde_json::Value::String(t.into()); }
+        if let Some(a) = app_id { extra["appId"] = serde_json::Value::String(a.into()); }
+        if let Some(a) = app_secret { extra["appSecret"] = serde_json::Value::String(a.into()); }
+        Self { command_type: "hermes_configure".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

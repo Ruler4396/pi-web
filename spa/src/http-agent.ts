@@ -8,7 +8,7 @@ export class HttpAgent {
   private _state: HttpAgentState;
   private listeners: Set<(event: AgentEvent, signal: AbortSignal) => void | Promise<void>> = new Set();
   private abortController: AbortController | null = null;
-  private _aborted = false;
+  private _aborted = false; private _isBtw = false;
   chatPanel?: any;
 
   constructor(sessionId: string) {
@@ -260,7 +260,9 @@ export class HttpAgent {
       }
 
       if (!messageSent && !this._aborted) {
-        this._state.addMessage({ role: "assistant", content: [{ type: "text", text: currentAssistantContent || "(no response)" }] });
+        const msg: any = { role: "assistant", content: [{ type: "text", text: currentAssistantContent || "(no response)" }] };
+        if (this._isBtw) { (msg as any).btw = true; this._isBtw = false; }
+        this._state.addMessage(msg);
       }
     } catch (err: any) {
       if (err.name === "AbortError") return;

@@ -45,7 +45,8 @@ export class SessionChat extends LitElement {
   }
   @state() showAddModelDialog = false;
   @state() showSettings = false;
-  @state() showShortcuts = false; @state() showSlashCommands = false; contextTokens = 0; contextMax = 65536;
+  @state() showShortcuts = false; @state() showConfig = false;
+  @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh" }; @state() showSlashCommands = false; contextTokens = 0; contextMax = 65536;
   @state() apiKeys: Record<string, string> = {};
   _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
@@ -203,6 +204,7 @@ export class SessionChat extends LitElement {
     var c = cmd.trim().toLowerCase();
     if (c === "/help") { this.showShortcuts = true; this.requestUpdate(); return; }
     if (c === "/keys" || c === "/settings") { this.toggleSettings(); return; }
+    if (c === "/config") { this.toggleConfig(); return; }
     if (c === "/models") { this.showModelDropdown = true; this.requestUpdate(); return; }
     if (c === "/theme dark") { this.theme = "dark"; document.documentElement.dataset.theme = "dark"; localStorage.setItem("pi-theme", "dark"); this.requestUpdate(); return; }
     if (c === "/theme light") { this.theme = ""; document.documentElement.dataset.theme = "light"; localStorage.setItem("pi-theme", "light"); this.requestUpdate(); return; }
@@ -210,11 +212,43 @@ export class SessionChat extends LitElement {
       if (this.agent) { this.agent.state.messages = []; }
       this.hasMessages = false; this.requestUpdate(); return;
     }
-    // Pass-through AI commands (sent to pi process)
-    if (["/fork", "/goal", "/plan", "/init", "/compact", "/btw"].some(x => c.startsWith(x))) {
+    // /btw: send to agent with btw flag (don't persist to main history)
+    if (c.startsWith("/btw ")) {
+      return; // http-agent handles this
+    }
+    // /goal: start autonomous agent loop (pi_rust handles iteration)
+    if (c.startsWith("/goal ")) {
+      return; // pi_rust handles autonomous execution
+    }
+    // Pass-through AI commands
+    if (["/fork", "/plan", "/init", "/compact"].some(x => c === x || c.startsWith(x + " "))) {
       return;
     }
   }
+
+  toggleConfig = async () => {
+    this.showConfig = !this.showConfig;
+    if (this.showConfig) {
+      try { const r = await fetch("/api/config"); this.piConfig = await r.json(); } catch {}
+    }
+    this.requestUpdate();
+  };
+  saveConfig = async () => {
+    await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(this.piConfig) });
+    // Apply theme
+    const t = this.piConfig.theme;
+    this.theme = t === "dark" ? "dark" : "";
+    document.documentElement.dataset.theme = t === "dark" ? "dark" : "light";
+    localStorage.setItem("pi-theme", t);
+    // Apply default model
+    if (this.piConfig.defaultModel && this.modelId !== this.piConfig.defaultModel) {
+      this.modelProvider = this.piConfig.defaultProvider || "deepseek";
+      this.modelId = this.piConfig.defaultModel;
+    }
+    this.thinkingLevel = this.piConfig.defaultThinkingLevel || "off";
+    this.showConfig = false;
+    this.requestUpdate();
+  };
 
   toggleShortcuts = () => { this.showShortcuts = !this.showShortcuts; this.requestUpdate(); };
 
@@ -639,7 +673,8 @@ export class SessionChat extends LitElement {
             <div class="shortcuts-body">
               <div class="shortcuts-section">全局</div>
               <div class="shortcut-row"><kbd>?</kbd><span>切换快捷键面板</span></div>
-              <div class="shortcut-row"><kbd>Esc</kbd><span>关闭对话框 / 下拉菜单</span></div>
+              <div class="shortcut-row"><kbd>Esc</kbd><span>关闭对话框 / 下拉菜单</span>
+              <div class="shortcut-row"><kbd>Ctrl+,</kbd><span>系统配置</span></div></div>
               <div class="shortcuts-section">编辑器</div>
               <div class="shortcut-row"><kbd>Enter</kbd><span>发送消息</span></div>
               <div class="shortcut-row"><kbd>Shift+Enter</kbd><span>换行</span></div>
@@ -696,6 +731,60 @@ export class SessionChat extends LitElement {
               <div style="font-size:11px;color:var(--text-weaker);flex:1;padding-top:4px">密钥保存在 keys.json，注入为 pi 进程的环境变量</div>
               <button class="model-dialog-cancel" @click=${() => { this.showSettings = false; this.requestUpdate(); }}>取消</button>
               <button class="model-dialog-submit" @click=${this.saveApiKeys}>保存</button>
+            </div>
+          </div>
+        ` : ""}
+        ${this.showConfig ? html`
+          <div class="modal-overlay" @click=${() => { this.showConfig = false; this.requestUpdate(); }}></div>
+          <div class="model-dialog" style="width:400px">
+            <div class="model-dialog-header">
+              <span>系统配置</span>
+              <button class="model-dialog-close" @click=${() => { this.showConfig = false; this.requestUpdate(); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="model-dialog-body" style="max-height:60vh;overflow-y:auto">
+              <div class="model-dialog-section-title">默认行为</div>
+              <div class="model-dialog-row">
+                <div class="model-dialog-field">
+                  <label>默认思考等级</label>
+                  <select style="padding:7px 10px;font-size:13px;border:none;border-radius:6px;background:var(--bg-weak);color:var(--text-base);font-family:ui-sans-serif,system-ui,sans-serif;outline:none;box-shadow:0 0 0 1px var(--border-color)" .value=${this.piConfig.defaultThinkingLevel} @change=${(e: Event) => { this.piConfig = { ...this.piConfig, defaultThinkingLevel: (e.target as HTMLSelectElement).value }; }}>
+                    <option value="off">关</option>
+                    <option value="low">低</option>
+                    <option value="medium">中</option>
+                    <option value="high">高</option>
+                    <option value="max">最大</option>
+                  </select>
+                </div>
+              </div>
+              <div class="model-dialog-section-title">外观</div>
+              <div class="model-dialog-row">
+                <div class="model-dialog-field">
+                  <label>主题</label>
+                  <select style="padding:7px 10px;font-size:13px;border:none;border-radius:6px;background:var(--bg-weak);color:var(--text-base);font-family:ui-sans-serif,system-ui,sans-serif;outline:none;box-shadow:0 0 0 1px var(--border-color)" .value=${this.piConfig.theme} @change=${(e: Event) => { this.piConfig = { ...this.piConfig, theme: (e.target as HTMLSelectElement).value }; }}>
+                    <option value="dark">暗色</option>
+                    <option value="light">亮色</option>
+                  </select>
+                </div>
+                <div class="model-dialog-field">
+                  <label>语言</label>
+                  <select style="padding:7px 10px;font-size:13px;border:none;border-radius:6px;background:var(--bg-weak);color:var(--text-base);font-family:ui-sans-serif,system-ui,sans-serif;outline:none;box-shadow:0 0 0 1px var(--border-color)" .value=${this.piConfig.language} @change=${(e: Event) => { this.piConfig = { ...this.piConfig, language: (e.target as HTMLSelectElement).value }; }}>
+                    <option value="zh">中文</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+              </div>
+              <div class="model-dialog-section-title">对话</div>
+              <div class="model-dialog-row">
+                <label class="model-dialog-checkbox">
+                  <input type="checkbox" .checked=${this.piConfig.hideThinkingBlock} @change=${(e: Event) => { this.piConfig = { ...this.piConfig, hideThinkingBlock: (e.target as HTMLInputElement).checked }; }}>
+                  <span>默认折叠思考块</span>
+                </label>
+              </div>
+            </div>
+            <div class="model-dialog-footer">
+              <button class="model-dialog-cancel" @click=${() => { this.showConfig = false; this.requestUpdate(); }}>取消</button>
+              <button class="model-dialog-submit" @click=${this.saveConfig}>保存</button>
             </div>
           </div>
         ` : ""}
@@ -819,6 +908,9 @@ export class SessionChat extends LitElement {
               <div class="slash-item" @click=${() => { this.handleCommand('/keys'); this.showSlashCommands = false; }}>
                 <span class="slash-label">/keys</span><span class="slash-desc">API 密钥</span>
               </div>
+              <div class="slash-item" @click=${() => { this.handleCommand("/config"); this.showSlashCommands = false; }}>
+                <span class="slash-label">/config</span><span class="slash-desc">系统配置</span>
+              </div>
               <div class="slash-section">AI 指令</div>
               <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
                 <span class="slash-label">/init</span><span class="slash-desc">初始化项目分析</span>
@@ -827,7 +919,7 @@ export class SessionChat extends LitElement {
                 <span class="slash-label">/plan</span><span class="slash-desc">制定实施计划</span>
               </div>
               <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
-                <span class="slash-label">/goal</span><span class="slash-desc">设定目标</span>
+                <span class="slash-label">/goal</span><span class="slash-desc">设定长期目标，自主执行迭代直到完成</span>
               </div>
               <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
                 <span class="slash-label">/fork</span><span class="slash-desc">分支对话</span>
@@ -836,7 +928,7 @@ export class SessionChat extends LitElement {
                 <span class="slash-label">/compact</span><span class="slash-desc">压缩上下文</span>
               </div>
               <div class="slash-item" @click=${() => { this.showSlashCommands = false; }}>
-                <span class="slash-label">/btw</span><span class="slash-desc">旁注说明</span>
+                <span class="slash-label">/btw</span><span class="slash-desc">临时提问，不污染对话历史</span>
               </div>
             </div>
             ${this.chatPanel}
