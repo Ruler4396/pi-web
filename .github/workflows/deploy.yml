@@ -37,6 +37,11 @@ jobs:
         with:
           toolchain: nightly
 
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+
       - name: Build pi-web
         run: cargo build --release
 

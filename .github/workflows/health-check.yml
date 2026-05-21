@@ -1,0 +1,37 @@
+name: Health Check
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check API health
+        run: |
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 https://aqsk.top:4443/api/health)
+          if [ "$HTTP" != "200" ]; then
+            echo "Health check failed: HTTP $HTTP"
+            exit 1
+          fi
+          echo "Health check passed: HTTP $HTTP"
+
+      - name: Check pages load
+        run: |
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 https://aqsk.top:4443/ -H "Authorization: Basic b3BlbmNvZGU6dWJnVFFZTzRyYVZ3TVhMcU5zUE82amUyTmJzUw==")
+          if [ "$HTTP" != "200" ]; then
+            echo "Page load failed: HTTP $HTTP"
+            exit 1
+          fi
+          echo "Page load passed: HTTP $HTTP"
+
+      - name: Check API sessions
+        run: |
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 https://aqsk.top:4443/api/session -H "Authorization: Basic b3BlbmNvZGU6dWJnVFFZTzRyYVZ3TVhMcU5zUE82amUyTmJzUw==")
+          if [ "$HTTP" != "200" ]; then
+            echo "Session API failed: HTTP $HTTP"
+            exit 1
+          fi
+          echo "Session API passed: HTTP $HTTP"
