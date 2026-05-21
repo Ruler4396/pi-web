@@ -186,9 +186,9 @@ export class SessionChat extends LitElement {
 
     // Hook slash command on message editor textarea
     const installSlashHook = () => {
-      // message-editor is inside ChatPanel's shadow DOM
+      // ChatPanel uses light DOM, message-editor is nested under agent-interface
       const cp = this.chatPanel;
-      const editor = (cp as any)?.shadowRoot?.querySelector("message-editor") || this.querySelector("message-editor");
+      const editor = (cp as any)?.querySelector("message-editor") || this.querySelector("message-editor");
       if (!editor) { setTimeout(installSlashHook, 500); return; }
       const ta = (editor as any).shadowRoot?.querySelector("textarea") || editor.querySelector("textarea");
       if (!ta) { setTimeout(installSlashHook, 500); return; }
@@ -973,7 +973,7 @@ export class SessionChat extends LitElement {
                 ${i === 7 ? html`<div class="slash-section">AI 指令</div>` : ""}
                 <div class="slash-item${i === this.slashIdx ? ' selected' : ''}" @click=${() => {
                   const cp = this.chatPanel;
-                  const editor = (cp as any)?.shadowRoot?.querySelector("message-editor") || this.querySelector("message-editor");
+                  const editor = (cp as any)?.querySelector("message-editor") || this.querySelector("message-editor");
                   const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea");
                   if (ta) { (ta as HTMLTextAreaElement).value = c.cmd + " "; ta.focus(); }
                   this.showSlashCommands = false;
