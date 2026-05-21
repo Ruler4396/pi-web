@@ -48,16 +48,6 @@ export class SessionChat extends LitElement {
     .error-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; background: var(--bg-base); text-align: center; padding: 32px; }
     .error-wrap .err-msg { color: #b91c1c; font-size: 14px; font-weight: 500; }
     .error-wrap button { margin-top: 8px; padding: 6px 18px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; }
-    .resize-handle { width: 4px; cursor: col-resize; flex-shrink: 0; background: transparent; transition: background 0.15s; }
-    .resize-handle:hover, .resize-handle.active { background: rgba(37,99,235,0.3); }
-    .ft-drop-overlay {
-      display: none; position: absolute; inset: 0;
-      background: rgba(37,99,235,0.06); border: 2px dashed rgba(37,99,235,0.5);
-      align-items: center; justify-content: center; z-index: 10;
-      font-size: 14px; color: #2563eb; font-weight: 500;
-      font-family: ui-sans-serif, system-ui, sans-serif; pointer-events: none;
-    }
-    .ft-drop-overlay.active { display: flex; }
   `;
 
   createRenderRoot() { return this; }

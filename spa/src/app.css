@@ -139,12 +139,12 @@ message-editor .bg-card > div:last-child > div:last-child button { opacity: 0.5 
 message-editor .bg-card > div:last-child > div:last-child button:hover { opacity: 1 !important; color: var(--accent) !important; background: rgba(37,99,235,0.08) !important; }
 
 /* ===== Tab panel (VSCode-style file tabs) ===== */
-.tab-panel { background: var(--bg-base); overflow: hidden; }
+.tab-panel { background: var(--bg-base); overflow: hidden; min-height: 0; }
 .tab-bar {
   display: flex; align-items: flex-end; gap: 0;
-  background: var(--bg-weak);
+  background: var(--bg-weak); flex-shrink: 0;
   border-bottom: 1px solid rgba(0,0,0,0.06);
-  overflow-x: auto; flex-shrink: 0; min-height: 32px;
+  overflow-x: auto; min-height: 32px;
 }
 .tab-bar::-webkit-scrollbar { height: 0; }
 .tab {
@@ -169,11 +169,12 @@ message-editor .bg-card > div:last-child > div:last-child button:hover { opacity
 .tab:hover .tab-close, .tab.active .tab-close { opacity: 1; }
 .tab .tab-close:hover { background: rgba(0,0,0,0.1); color: var(--text-strong); }
 .tab-content {
-  flex: 1; overflow: hidden; min-height: 0;
-  display: flex; flex-direction: column;
+  flex: 1 1 0px; min-height: 0;
+  overflow: hidden;
 }
 .tab-content .preview-code {
-  flex: 1; margin: 0; padding: 14px 16px; font-size: 13px; line-height: 1.6;
+  width: 100%; height: 100%; margin: 0; padding: 14px 16px;
+  font-size: 13px; line-height: 1.6;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   white-space: pre; color: var(--text-base); tab-size: 2; background: transparent;
   overflow: auto;
@@ -183,6 +184,19 @@ message-editor .bg-card > div:last-child > div:last-child button:hover { opacity
   display: block; padding: 16px; text-align: center; font-size: 13px;
   color: var(--text-weaker); font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
+.resize-handle {
+  width: 4px; cursor: col-resize; flex-shrink: 0;
+  background: transparent; transition: background 0.15s;
+}
+.resize-handle:hover, .resize-handle.active { background: rgba(37,99,235,0.3); }
+.ft-drop-overlay {
+  display: none; position: absolute; inset: 0;
+  background: rgba(37,99,235,0.06); border: 2px dashed rgba(37,99,235,0.5);
+  align-items: center; justify-content: center; z-index: 10;
+  font-size: 14px; color: #2563eb; font-weight: 500;
+  font-family: ui-sans-serif, system-ui, sans-serif; pointer-events: none;
+}
+.ft-drop-overlay.active { display: flex; }
 
 /* ===== Terminal ===== */
 .terminal-panel {
