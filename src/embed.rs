@@ -3,7 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use rust_embed::{RustEmbed, Embed};
+use rust_embed::RustEmbed;
 
 #[derive(RustEmbed)]
 #[folder = "spa/dist/"]
@@ -13,9 +13,9 @@ pub async fn spa_fallback(uri: axum::http::Uri) -> Response {
     let path = uri.path().trim_start_matches('/');
 
     let file = if path.is_empty() {
-        SpaAssets::get("index.html")
+        <SpaAssets as RustEmbed>::get("index.html")
     } else {
-        SpaAssets::get(path)
+        <SpaAssets as RustEmbed>::get(path)
     };
 
     match file {
@@ -27,7 +27,7 @@ pub async fn spa_fallback(uri: axum::http::Uri) -> Response {
                 .body(axum::body::Body::from(content.data))
                 .unwrap()
         }
-        None => SpaAssets::get("index.html")
+        None => <SpaAssets as RustEmbed>::get("index.html")
             .map(|content| {
                 Response::builder()
                     .status(StatusCode::OK)
