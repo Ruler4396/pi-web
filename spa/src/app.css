@@ -142,12 +142,13 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 }
 .ft-drop-overlay.active { display: block; }
 .ft-drop-hint {
-  display: none; position: absolute; z-index: 11;
-  padding: 4px 10px; background: rgba(0,0,0,0.75); color: #fff;
-  border-radius: 4px; font-size: 12px; font-family: ui-sans-serif, system-ui, sans-serif;
+  display: none; position: fixed; z-index: 9999;
+  padding: 6px 14px; background: #2563eb; color: #fff;
+  border-radius: 6px; font-size: 13px; font-weight: 600;
+  font-family: ui-sans-serif, system-ui, sans-serif;
   white-space: nowrap; pointer-events: none;
+  box-shadow: 0 4px 16px rgba(37,99,235,0.3);
 }
-[data-theme="dark"] .ft-drop-hint { background: rgba(30,30,30,0.9); }
 .ft-drop-hint.active { display: block; }
 .tree-node.drop-target { background: rgba(37,99,235,0.1) !important; outline: 1px solid rgba(37,99,235,0.4); }
 [data-theme="dark"] .tree-node.drop-target { background: rgba(37,99,235,0.2) !important; }

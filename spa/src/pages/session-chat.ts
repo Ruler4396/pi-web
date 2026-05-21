@@ -184,6 +184,8 @@ export class SessionChat extends LitElement {
 
   // Global drag-drop for file tree
   private dragExpandTimer = 0;
+  private dragHoverStart = 0;
+  private dragHoverNode: string | null = null;
   private onGlobalDragOver = (e: DragEvent) => {
     e.preventDefault();
     const sidebar = this.querySelector(".sidebar");
@@ -191,7 +193,7 @@ export class SessionChat extends LitElement {
       if (!this.fileTreeDragging) { this.fileTreeDragging = true; this.requestUpdate(); }
       const target = document.elementFromPoint(e.clientX, e.clientY);
       const treeNode = target?.closest(".tree-node") as HTMLElement | null;
-      // Clear previous drop target
+      // Clear previous drop target highlight
       if (this.dropTargetNode) {
         const prev = this.querySelector(".tree-node.drop-target");
         if (prev) prev.classList.remove("drop-target");
@@ -205,32 +207,37 @@ export class SessionChat extends LitElement {
           treeNode.classList.add("drop-target");
           this.dropTargetNode = name;
           this.dropHintText = "释放到 " + name + " 目录"; // 释放到 X 目录
-          // Auto-expand on hover
-          clearTimeout(this.dragExpandTimer);
-          this.dragExpandTimer = window.setTimeout(() => {
-            if (!this.querySelector(".tree-node.drop-target")) return;
-            // Dispatch click to expand via file-tree toggle
+          // Timestamp-based auto-expand: only set timer once per node hover
+          if (this.dragHoverNode !== name) {
+            this.dragHoverNode = name;
+            this.dragHoverStart = Date.now();
+          } else if (Date.now() - this.dragHoverStart > 600) {
+            // Auto-expand: dispatch click on the tree node
             treeNode.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-          }, 600);
+            this.dragHoverNode = null; // reset to avoid re-expanding
+          }
         } else {
+          this.dragHoverNode = null;
           this.dropHintText = "释放到当前目录"; // 释放到当前目录
         }
         const rect = treeNode.getBoundingClientRect();
         this.dropHintX = rect.left;
         this.dropHintY = rect.bottom + 4;
       } else {
+        this.dragHoverNode = null;
         this.dropHintText = "拖放文件到此处上传"; // 拖放文件到此处上传
         this.dropHintX = e.clientX;
-        this.dropHintY = e.clientY + 16;
+        this.dropHintY = e.clientY + 20;
       }
       this.requestUpdate();
-      clearTimeout(this.dragExpandTimer);
     }
   };
   private onGlobalDragLeave = (e: DragEvent) => {
     const sidebar = this.querySelector(".sidebar");
     if (sidebar && !sidebar.contains(e.relatedTarget as Node)) {
       this.fileTreeDragging = false;
+      this.dragHoverNode = null;
+      this.dragHoverStart = 0;
       if (this.dropTargetNode) {
         const prev = this.querySelector(".tree-node.drop-target");
         if (prev) prev.classList.remove("drop-target");
@@ -238,17 +245,17 @@ export class SessionChat extends LitElement {
       }
       this.requestUpdate();
     }
-    clearTimeout(this.dragExpandTimer);
   };
   private onGlobalDrop = (e: DragEvent) => {
     e.preventDefault();
     this.fileTreeDragging = false; this.requestUpdate();
-    clearTimeout(this.dragExpandTimer);
+    this.dragHoverNode = null; this.dragHoverStart = 0;
     if (this.dropTargetNode) {
       const prev = this.querySelector(".tree-node.drop-target");
       if (prev) prev.classList.remove("drop-target");
       this.dropTargetNode = null;
     }
+    // Determine drop target directory
     const target = document.elementFromPoint(e.clientX, e.clientY);
     let dropCwd = this.sessionCwd;
     if (target) {
@@ -260,14 +267,36 @@ export class SessionChat extends LitElement {
         dropCwd = this.sessionCwd.replace(/\/+$/, "") + "/" + (isFolder ? name : "");
       }
     }
+    // Actually upload the files
     if (e.dataTransfer?.files) {
-      this.dispatchEvent(new CustomEvent("file-drop", {
-        detail: { files: e.dataTransfer.files, cwd: dropCwd },
-        bubbles: true, composed: true,
-      }));
+      this.uploadDroppedFiles(e.dataTransfer.files, dropCwd);
     }
   };
-
+  async uploadDroppedFiles(files: FileList, cwd: string) {
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const file = files[i];
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(",")[1] || "");
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const relPath = (file as any).webkitRelativePath || file.name;
+        const fullPath = cwd.replace(/\/+$/, "") + "/" + relPath;
+        await fetch("/api/file/write", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: fullPath, content: base64, encoding: "base64" }),
+        });
+      } catch(e) { console.error("Upload error:", e); }
+    }
+    // Refresh file tree
+    const ft = this.querySelector("file-tree") as any;
+    if (ft && ft.loadDir) {
+      try { await ft.loadDir(this.sessionCwd); } catch(e) {}
+    }
+  }
   async runTerminalCommand(cmd: string, input: HTMLTextAreaElement) {
     this.terminalContent += this.terminalCwd + " $ " + cmd + "\n";
     input.value = "";
