@@ -309,6 +309,34 @@ export class SessionChat extends LitElement {
 
 
       </div>
+        ${this.showTerminal ? html`
+          <div class="terminal-panel">
+            <div class="terminal-header">
+              <span class="terminal-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Terminal
+              </span>
+              <button class="close-btn" @click=${this.toggleTerminal}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="terminal-body">
+              <div class="terminal-output-wrap"><pre class="terminal-output">${this.terminalContent}</pre></div>
+              <div class="terminal-input-wrap">
+                <span class="terminal-prompt">$</span>
+                <textarea class="terminal-input" placeholder="type a command..." rows="1"
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      const el = e.target as HTMLTextAreaElement;
+                      const cmd = el.value.trim();
+                      if (cmd) this.runTerminalCommand(cmd, el);
+                    }
+                  }}></textarea>
+              </div>
+            </div>
+          </div>
+        ` : ""}
+
     `;
   }
 }
