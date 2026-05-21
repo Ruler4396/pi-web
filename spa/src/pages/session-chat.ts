@@ -65,7 +65,8 @@ export class SessionChat extends LitElement {
     { cmd: "/compact", desc: "压缩上下文", action: "ai" },
     { cmd: "/btw", desc: "临时提问，不污染对话", action: "ai" },
   ];
-  @state() toasts: {id: number, text: string, type: string}[] = []; contextTokens = 0; contextMax = 1048576; // DeepSeek V4 1M context
+  @state() toasts: {id: number, text: string, type: string}[] = [];
+  @state() showContextDetail = false; contextTokens = 0; contextMax = 1048576; // DeepSeek V4 1M context
   @state() apiKeys: Record<string, string> = {};
   _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
