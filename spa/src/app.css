@@ -317,3 +317,115 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 [data-theme="dark"] .hl-str { color: #a5d6ff; }
 [data-theme="dark"] .hl-cmt { color: #8b949e; }
 [data-theme="dark"] .hl-num { color: #79c0ff; }
+
+/* Model selector v2 */
+.model-option-sub {
+  font-size: 10px; color: var(--text-weaker);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-left: auto; text-transform: lowercase;
+}
+.model-option {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; font-size: 13px; cursor: pointer;
+  color: var(--text-base); font-family: ui-sans-serif, system-ui, sans-serif;
+  transition: background 0.1s;
+}
+.model-option:hover { background: rgba(0,0,0,0.04); }
+.model-option.active { color: var(--accent); background: rgba(37,99,235,0.06); }
+.model-dropdown-divider {
+  height: 1px; background: rgba(0,0,0,0.06); margin: 4px 8px;
+}
+.model-add-btn {
+  font-size: 12px; color: var(--text-weak); gap: 6px;
+}
+.model-add-btn:hover { color: var(--accent); }
+.model-delete-btn {
+  display: none; width: 20px; height: 20px; padding: 2px;
+  border-radius: 4px; color: var(--text-weaker);
+  align-items: center; justify-content: center; flex-shrink: 0;
+}
+.model-option:hover .model-delete-btn { display: flex; }
+.model-delete-btn:hover { color: #e00; background: rgba(224,0,0,0.08); }
+
+/* Add model dialog */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(0,0,0,0.3); backdrop-filter: blur(2px);
+}
+.model-dialog {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  z-index: 61; width: 440px; max-width: 90vw;
+  background: var(--surface-raised); border-radius: 12px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.15);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.model-dialog-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 12px; font-size: 15px; font-weight: 600;
+  color: var(--text-strong);
+}
+.model-dialog-close {
+  width: 28px; height: 28px; padding: 4px; background: none;
+  border: none; border-radius: 6px; cursor: pointer;
+  color: var(--text-weaker); display: flex; align-items: center; justify-content: center;
+}
+.model-dialog-close:hover { background: rgba(0,0,0,0.06); color: var(--text-base); }
+.model-dialog-body {
+  padding: 0 20px 16px; display: flex; flex-direction: column; gap: 12px;
+}
+.model-dialog-row { display: flex; gap: 10px; }
+.model-dialog-field { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.model-dialog-field label {
+  font-size: 11px; font-weight: 600; color: var(--text-weak);
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.model-dialog-field input[type="text"],
+.model-dialog-field input[type="password"] {
+  padding: 7px 10px; font-size: 13px;
+  border: none; border-radius: 6px;
+  background: var(--bg-weak); color: var(--text-base);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  outline: none;
+  box-shadow: 0 0 0 1px var(--border-color);
+}
+.model-dialog-field input:focus {
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.25);
+}
+.model-dialog-checkbox {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-base); cursor: pointer;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.model-dialog-checkbox input[type="checkbox"] {
+  width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;
+}
+.model-dialog-footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 12px 20px 16px; border-top: 1px solid var(--border-color);
+}
+.model-dialog-cancel {
+  padding: 6px 14px; font-size: 13px;
+  background: none; border: none; border-radius: 6px;
+  color: var(--text-weak); cursor: pointer;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.model-dialog-cancel:hover { background: rgba(0,0,0,0.04); color: var(--text-base); }
+.model-dialog-submit {
+  padding: 6px 16px; font-size: 13px; font-weight: 500;
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 6px; cursor: pointer;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.model-dialog-submit:hover { opacity: 0.9; }
+.model-dialog-submit:disabled { opacity: 0.4; cursor: default; }
+
+/* Dark mode overrides */
+[data-theme="dark"] .model-dropdown { background: #1e1e1e; }
+[data-theme="dark"] .model-option:hover { background: rgba(255,255,255,0.04); }
+[data-theme="dark"] .model-option.active { background: rgba(37,99,235,0.15); }
+[data-theme="dark"] .model-dropdown-divider { background: rgba(255,255,255,0.06); }
+[data-theme="dark"] .modal-overlay { background: rgba(0,0,0,0.5); }
+[data-theme="dark"] .model-dialog { background: #1e1e1e; box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 16px 48px rgba(0,0,0,0.4); }
+[data-theme="dark"] .model-dialog-field input { background: #2a2a2a; }
+[data-theme="dark"] .model-dialog-footer { border-color: rgba(255,255,255,0.06); }
+[data-theme="dark"] .model-dialog-cancel:hover { background: rgba(255,255,255,0.04); }

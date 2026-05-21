@@ -30,11 +30,12 @@ export class SessionChat extends LitElement {
   @state() private theme: "dark" | "" = "dark";
   @state() private sessionCwd = "/root";
   @state() private hasMessages = false;
-  @state() private showTerminal = false;
-  @state() private showModelDropdown = false;
-  @state() private modelProvider = "deepseek";
-  @state() private modelId = "deepseek-chat";
-  @state() private modelLabel = "DeepSeek Chat";
+    @state() showTerminal = false;
+  @state() showModelDropdown = false;
+  @state() modelProvider = "deepseek"; @state() modelId = "deepseek-chat"; @state() modelLabel = "DeepSeek Chat";
+  @state() showAddModelDialog = false;
+  recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
+  @state() addModelForm = { provider: "", id: "", label: "", apiKey: "", baseUrl: "", thinking: false };
   @state() private terminalContent = "";
   @state() private terminalCwd = "/root";
   @state() private tabs: FileTab[] = [];
@@ -137,17 +138,99 @@ export class SessionChat extends LitElement {
   }
 
   toggleModelDropdown = () => { this.showModelDropdown = !this.showModelDropdown; this.requestUpdate(); };
-  selectModel = (provider: string, id: string, label: string) => {
+  selectModel = (provider: string, id: string, label: string, thinking: boolean, builtin: boolean) => {
     this.modelProvider = provider; this.modelId = id; this.modelLabel = label;
     this.showModelDropdown = false;
     if (this.agent) {
       this.agent.setModel(provider, id).catch(() => {});
-      // Also update the ChatPanel's internal model
       const state = this.agent.state as any;
       if (state._state) state._state.model = { provider, id, label };
     }
+    // Save to recent
+    const entry = { provider, id, label, thinking, builtin };
+    const recents = JSON.parse(localStorage.getItem("pi-recent-models") || "[]");
+    const filtered = recents.filter((r: any) => !(r.provider === provider && r.id === id));
+    filtered.unshift(entry);
+    localStorage.setItem("pi-recent-models", JSON.stringify(filtered.slice(0, 5)));
+    this.recentModels = filtered.slice(0, 5);
     this.requestUpdate();
   };
+  deleteCustomModel = (provider: string, modelId: string, e: Event) => {
+    e.stopPropagation();
+    fetch("/api/models/delete/" + encodeURIComponent(provider) + "/" + encodeURIComponent(modelId), { method: "DELETE" })
+      .then(() => { this.loadModels(); this.requestUpdate(); })
+      .catch(() => {});
+  };
+  openAddModel = () => {
+    this.showModelDropdown = false;
+    this.showAddModelDialog = true;
+    this.addModelForm = { provider: "", id: "", label: "", apiKey: "", baseUrl: "", thinking: false };
+    this.requestUpdate();
+  };
+  closeAddModel = () => { this.showAddModelDialog = false; this.requestUpdate(); };
+  submitAddModel = () => {
+    const f = this.addModelForm;
+    if (!f.provider || !f.id || !f.label) return;
+    fetch("/api/models/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: f.provider, id: f.id, label: f.label,
+        thinking: f.thinking, apiKey: f.apiKey, baseUrl: f.baseUrl
+      })
+    }).then(() => {
+      this.showAddModelDialog = false;
+      this.loadModels();
+      this.selectModel(f.provider, f.id, f.label, f.thinking, false);
+    }).catch(() => {});
+  };
+  async loadModels() {
+    try {
+      const res = await fetch("/api/models");
+      const models = await res.json();
+      if (Array.isArray(models)) {
+        (this.agent!.state as any).availableModels = models;
+        (this.agent!.state as any)._state.availableModels = models;
+        this.requestUpdate();
+      }
+    } catch (_) {}
+  }
+
+  renderModelDropdown() {
+    const recents = JSON.parse(localStorage.getItem("pi-recent-models") || "[]");
+    const alist = (this.agent?.state as any)?.availableModels || [];
+    const builtin = alist.filter((m: any) => m.builtin !== false);
+    const custom = alist.filter((m: any) => m.builtin === false);
+    const recentShown = new Set<string>();
+    const parts: any[] = [];
+    if (recents.length > 0) {
+      parts.push(html`<div class="model-section-title">Recent</div>`);
+      for (const r of recents.slice(0, 3)) {
+        const key = r.provider + "/" + r.id;
+        if (recentShown.has(key)) continue;
+        recentShown.add(key);
+        parts.push(html`<div class="model-option${this.modelId === r.id && this.modelProvider === r.provider ? ' active' : ''}" @click=${() => this.selectModel(r.provider, r.id, r.label, r.thinking, r.builtin)}><span>${r.label}</span><span class="model-option-sub">${r.provider}</span></div>`);
+      }
+    }
+    if (builtin.length > 0) {
+      parts.push(html`<div class="model-section-title">Built-in</div>`);
+      for (const m of builtin) {
+        const key = m.provider + "/" + m.id;
+        if (recentShown.has(key)) continue;
+        recentShown.add(key);
+        parts.push(html`<div class="model-option${this.modelId === m.id && this.modelProvider === m.provider ? ' active' : ''}" @click=${() => this.selectModel(m.provider, m.id, m.label, m.thinking, m.builtin)}><span>${m.label}</span><span class="model-option-sub">${m.provider}</span></div>`);
+      }
+    }
+    if (custom.length > 0) {
+      parts.push(html`<div class="model-section-title">Custom</div>`);
+      for (const m of custom) {
+        parts.push(html`<div class="model-option${this.modelId === m.id && this.modelProvider === m.provider ? ' active' : ''}" @click=${() => this.selectModel(m.provider, m.id, m.label, m.thinking, m.builtin)}><span>${m.label}</span><span class="model-option-sub">${m.provider}</span><span class="model-delete-btn" @click=${(e: Event) => this.deleteCustomModel(m.provider, m.id, e)} title="Delete"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></span></div>`);
+      }
+    }
+    parts.push(html`<div class="model-dropdown-divider"></div>`);
+    parts.push(html`<div class="model-option model-add-btn" @click=${this.openAddModel}><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add model</div>`);
+    return parts;
+  }
 
   toggleTerminal = () => { this.showTerminal = !this.showTerminal; this.requestUpdate(); };
 
@@ -433,12 +516,7 @@ export class SessionChat extends LitElement {
             </button>
             ${this.showModelDropdown ? html`
               <div class="model-dropdown">
-                <div class="model-section-title">DeepSeek</div>
-                <div class="model-option ${this.modelId === 'deepseek-chat' ? 'active' : ''}" @click=${() => this.selectModel('deepseek', 'deepseek-chat', 'DeepSeek Chat')}>DeepSeek Chat</div>
-                <div class="model-option ${this.modelId === 'deepseek-reasoner' ? 'active' : ''}" @click=${() => this.selectModel('deepseek', 'deepseek-reasoner', 'DeepSeek R1')}>DeepSeek R1</div>
-                <div class="model-section-title">Anthropic</div>
-                <div class="model-option ${this.modelId === 'claude-sonnet-4-5' ? 'active' : ''}" @click=${() => this.selectModel('anthropic', 'claude-sonnet-4-5', 'Claude Sonnet 4.5')}>Claude Sonnet 4.5</div>
-                <div class="model-option ${this.modelId === 'claude-haiku-4-5' ? 'active' : ''}" @click=${() => this.selectModel('anthropic', 'claude-haiku-4-5', 'Claude Haiku 4.5')}>Claude Haiku 4.5</div>
+                ${this.renderModelDropdown()}
               </div>
             ` : ""}
           </div>

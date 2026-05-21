@@ -85,13 +85,70 @@ pub async fn update(
     Ok(StatusCode::NO_CONTENT)
 }
 
-pub async fn models() -> Result<Json<serde_json::Value>, StatusCode> {
-    Ok(Json(serde_json::json!([
-        {"provider": "deepseek", "id": "deepseek-chat", "label": "DeepSeek Chat", "thinking": false},
-        {"provider": "deepseek", "id": "deepseek-reasoner", "label": "DeepSeek R1", "thinking": true},
-        {"provider": "anthropic", "id": "claude-sonnet-4-5", "label": "Claude Sonnet 4.5", "thinking": false},
-        {"provider": "anthropic", "id": "claude-haiku-4-5", "label": "Claude Haiku 4.5", "thinking": false},
-    ])))
+pub async fn models(State(state): State<AppState>) -> Result<Json<serde_json::Value>, StatusCode> {
+    let builtin = vec![
+        serde_json::json!({"provider": "deepseek", "id": "deepseek-chat", "label": "DeepSeek Chat", "thinking": false, "builtin": true}),
+        serde_json::json!({"provider": "deepseek", "id": "deepseek-reasoner", "label": "DeepSeek R1", "thinking": true, "builtin": true}),
+        serde_json::json!({"provider": "anthropic", "id": "claude-sonnet-4-5", "label": "Claude Sonnet 4.5", "thinking": false, "builtin": true}),
+        serde_json::json!({"provider": "anthropic", "id": "claude-haiku-4-5", "label": "Claude Haiku 4.5", "thinking": false, "builtin": true}),
+    ];
+    let mut models: Vec<serde_json::Value> = builtin;
+    let custom_file = state.config.sessions_dir.join("models.json");
+    if custom_file.exists() {
+        if let Ok(content) = tokio::fs::read_to_string(&custom_file).await {
+            if let Ok(custom) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
+                models.extend(custom);
+            }
+        }
+    }
+    Ok(Json(serde_json::json!(models)))
+}
+
+pub async fn save_model(
+    State(state): State<AppState>,
+    Json(body): Json<serde_json::Value>,
+) -> Result<StatusCode, StatusCode> {
+    let custom_file = state.config.sessions_dir.join("models.json");
+    let mut models: Vec<serde_json::Value> = if custom_file.exists() {
+        tokio::fs::read_to_string(&custom_file).await
+            .ok()
+            .and_then(|c| serde_json::from_str(&c).ok())
+            .unwrap_or_default()
+    } else {
+        vec![]
+    };
+    let mut entry = body.clone();
+    entry["builtin"] = serde_json::Value::Bool(false);
+    let pid = entry["provider"].as_str().unwrap_or("");
+    let mid = entry["id"].as_str().unwrap_or("");
+    if let Some(existing) = models.iter_mut().find(|m| m["provider"].as_str() == Some(pid) && m["id"].as_str() == Some(mid)) {
+        *existing = entry;
+    } else {
+        models.push(entry);
+    }
+    let json = serde_json::to_string(&models).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    tokio::fs::write(&custom_file, json).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(StatusCode::OK)
+}
+
+pub async fn delete_model(
+    State(state): State<AppState>,
+    Path((provider, model_id)): Path<(String, String)>,
+) -> Result<StatusCode, StatusCode> {
+    let custom_file = state.config.sessions_dir.join("models.json");
+    if !custom_file.exists() {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    let mut models: Vec<serde_json::Value> = tokio::fs::read_to_string(&custom_file).await
+        .ok()
+        .and_then(|c| serde_json::from_str(&c).ok())
+        .unwrap_or_default();
+    models.retain(|m| {
+        !(m["provider"].as_str() == Some(&provider) && m["id"].as_str() == Some(&model_id))
+    });
+    let json = serde_json::to_string(&models).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    tokio::fs::write(&custom_file, json).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn export_session(

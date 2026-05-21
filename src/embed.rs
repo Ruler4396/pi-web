@@ -3,7 +3,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
-use rust_embed::RustEmbed;
+use rust_embed::{RustEmbed, Embed};
 
 #[derive(RustEmbed)]
 #[folder = "spa/dist/"]
