@@ -46,6 +46,10 @@ export class SessionChat extends LitElement {
   @state() private dropHintX = 0;
   @state() private dropHintY = 0;
   @state() private dropHintText = "";
+  @state() private contextMenuNode: any = null;
+  @state() private contextMenuX = 0;
+  @state() private contextMenuY = 0;
+  @state() private contextMenuVisible = false;
   @state() private dropTargetNode: string | null = null;
 
   static styles = css`
@@ -79,6 +83,17 @@ export class SessionChat extends LitElement {
     document.addEventListener("dragover", this.onGlobalDragOver);
     document.addEventListener("dragleave", this.onGlobalDragLeave);
     document.addEventListener("drop", this.onGlobalDrop);
+    // Context menu for file tree
+    this.addEventListener("file-contextmenu", ((e) => {
+      this.contextMenuNode = e.detail.node;
+      this.contextMenuX = e.detail.x;
+      this.contextMenuY = e.detail.y;
+      this.contextMenuVisible = true;
+      this.requestUpdate();
+    }) as EventListener);
+    document.addEventListener("click", () => {
+      if (this.contextMenuVisible) { this.contextMenuVisible = false; this.requestUpdate(); }
+    });
   }
 
   disconnectedCallback() {
@@ -272,6 +287,26 @@ export class SessionChat extends LitElement {
       this.uploadDroppedFiles(e.dataTransfer.files, dropCwd);
     }
   };
+  async downloadFile(node: any) {
+    if (!node || node.type === "directory") return;
+    const a = document.createElement("a");
+    a.href = "/api/file/download?path=" + encodeURIComponent(this.sessionCwd + "/" + node.path);
+    a.download = node.name;
+    a.click();
+  }
+  async deleteFileNode(node: any) {
+    if (!node || !confirm("Delete " + node.name + "?")) return;
+    try {
+      await fetch("/api/file/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: this.sessionCwd + "/" + node.path }),
+      });
+      const ft = this.querySelector("file-tree") as any;
+      if (ft && ft.loadDir) { try { await ft.loadDir(this.sessionCwd); } catch(e) {} }
+    } catch(e) { console.error(e); }
+  }
+
   async uploadDroppedFiles(files: FileList, cwd: string) {
     for (let i = 0; i < files.length; i++) {
       try {
@@ -454,6 +489,18 @@ export class SessionChat extends LitElement {
           </div>
         ` : ""}
 
+        ${this.contextMenuVisible && this.contextMenuNode ? html`
+          <div class="context-menu" style="left:${this.contextMenuX}px;top:${this.contextMenuY}px">
+            ${this.contextMenuNode.type === "file" ? html`
+              <div class="context-item" @click=${() => this.downloadFile(this.contextMenuNode)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download
+              </div>
+            ` : ""}
+            <div class="context-item danger" @click=${() => this.deleteFileNode(this.contextMenuNode)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Delete
+            </div>
+          </div>
+        ` : ""}
     `;
   }
 }
