@@ -32,7 +32,8 @@ export class SessionChat extends LitElement {
   @state() private hasMessages = false;
     @state() showTerminal = false;
   @state() showModelDropdown = false;
-  @state() modelProvider = "deepseek"; @state() modelId = "deepseek-chat"; @state() modelLabel = "DeepSeek Chat";
+  @state() modelProvider = "deepseek"; @state() modelId = "deepseek-chat"; @state() modelLabel = "DeepSeek V4 Chat";
+  @state() thinkingLevel = "off";
   @state() showAddModelDialog = false;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
   @state() addModelForm = { provider: "", id: "", label: "", apiKey: "", baseUrl: "", thinking: false };
@@ -140,6 +141,7 @@ export class SessionChat extends LitElement {
   toggleModelDropdown = () => { this.showModelDropdown = !this.showModelDropdown; this.requestUpdate(); };
   selectModel = (provider: string, id: string, label: string, thinking: boolean, builtin: boolean) => {
     this.modelProvider = provider; this.modelId = id; this.modelLabel = label;
+    this.thinkingLevel = thinking ? "high" : "off";
     this.showModelDropdown = false;
     if (this.agent) {
       this.agent.setModel(provider, id).catch(() => {});
@@ -160,6 +162,18 @@ export class SessionChat extends LitElement {
     fetch("/api/models/delete/" + encodeURIComponent(provider) + "/" + encodeURIComponent(modelId), { method: "DELETE" })
       .then(() => { this.loadModels(); this.requestUpdate(); })
       .catch(() => {});
+  };
+  toggleThinking = () => {
+    const levels = ["off", "low", "medium", "high"];
+    const idx = levels.indexOf(this.thinkingLevel);
+    this.thinkingLevel = levels[(idx + 1) % levels.length];
+    if (this.agent) this.agent.setThinking(this.thinkingLevel).catch(() => {});
+    this.requestUpdate();
+  };
+  setThinkingLevel = (level: string) => {
+    this.thinkingLevel = level;
+    if (this.agent) this.agent.setThinking(level).catch(() => {});
+    this.requestUpdate();
   };
   openAddModel = () => {
     this.showModelDropdown = false;
@@ -509,6 +523,10 @@ export class SessionChat extends LitElement {
           <span class="divider">&#183;</span><span class="sid">${sid}</span>
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
           <div style="flex:1"></div>
+          <div class="thinking-pill" @click=${this.toggleThinking} title="Thinking: ${this.thinkingLevel}">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span class="thinking-label">${this.thinkingLevel}</span>
+          </div>
           <div class="model-select-wrap" style="position:relative">
             <button class="model-pill" @click=${this.toggleModelDropdown} title="Switch model">
               <span class="model-pill-name">${this.modelLabel}</span>

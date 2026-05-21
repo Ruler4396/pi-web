@@ -429,3 +429,17 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 [data-theme="dark"] .model-dialog-field input { background: #2a2a2a; }
 [data-theme="dark"] .model-dialog-footer { border-color: rgba(255,255,255,0.06); }
 [data-theme="dark"] .model-dialog-cancel:hover { background: rgba(255,255,255,0.04); }
+
+/* Thinking level pill */
+.thinking-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 3px 7px; font-size: 10px; font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--accent); background: rgba(37,99,235,0.08);
+  border: none; border-radius: 4px; cursor: pointer;
+  transition: all 0.12s; white-space: nowrap; text-transform: uppercase;
+}
+.thinking-pill:hover { background: rgba(37,99,235,0.14); }
+.thinking-label { min-width: 20px; text-align: center; }
+[data-theme= dark] .thinking-pill { background: rgba(37,99,235,0.12); }
+[data-theme=dark] .thinking-pill:hover { background: rgba(37,99,235,0.2); }
