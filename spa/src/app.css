@@ -788,3 +788,74 @@ message-list .message-body, streaming-message-container .message-body {
 [data-theme="dark"] .diff-view { background: transparent; }
 [data-theme="dark"] .dl-add { background: rgba(34,197,94,0.08); }
 [data-theme="dark"] .dl-rem { background: rgba(239,68,68,0.08); }
+
+/* Tool progress indicator in topbar */
+.tool-indicator {
+  display: flex; align-items: center; gap: 5px;
+  padding: 1px 8px; border-radius: 10px;
+  background: rgba(37,99,235,0.08);
+  font-size: 11px; color: #2563eb;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.tool-spinner {
+  width: 10px; height: 10px; border: 2px solid rgba(37,99,235,0.2);
+  border-top-color: #2563eb; border-radius: 50%;
+  animation: tspin 0.6s linear infinite;
+}
+@keyframes tspin { to { transform: rotate(360deg); } }
+
+/* Sidebar header actions */
+.sidebar-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 8px 4px; gap: 4px;
+}
+.sidebar-header-actions { display: flex; align-items: center; gap: 2px; }
+.file-action-btn {
+  width: 22px; height: 22px; padding: 2px; border: none; border-radius: 4px;
+  background: transparent; cursor: pointer; color: var(--text-weaker);
+  display: flex; align-items: center; justify-content: center;
+}
+.file-action-btn:hover { background: rgba(37,99,235,0.1); color: #2563eb; }
+.file-action-btn.primary { background: #2563eb; color: #fff; width: auto; padding: 3px 8px; font-size: 11px; font-family: ui-sans-serif,system-ui,sans-serif; }
+.file-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* New file dialog */
+.new-file-dialog {
+  display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.05);
+}
+.new-file-input {
+  flex: 1; padding: 3px 8px; font-size: 12px; border: none; border-radius: 4px;
+  background: var(--bg-weak); color: var(--text-base);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  outline: none; box-shadow: 0 0 0 1px var(--border-color);
+}
+
+/* Message edit/regenerate buttons */
+user-message, assistant-message {
+  position: relative;
+}
+user-message:hover .msg-edit-btn,
+assistant-message:hover .msg-regen-btn {
+  opacity: 1;
+}
+.msg-edit-btn, .msg-regen-btn {
+  position: absolute; top: 4px; right: 4px;
+  width: 22px; height: 22px; padding: 2px;
+  border: none; border-radius: 4px;
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
+  cursor: pointer; opacity: 0; transition: opacity 0.15s;
+  color: var(--text-weaker);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 5;
+}
+.msg-edit-btn:hover, .msg-regen-btn:hover {
+  background: rgba(37,99,235,0.08); color: #2563eb;
+}
+[data-theme="dark"] .msg-edit-btn, [data-theme="dark"] .msg-regen-btn {
+  background: #2a2a2a;
+} 
+[data-theme="dark"] .msg-edit-btn:hover, [data-theme="dark"] .msg-regen-btn:hover {
+  background: rgba(37,99,235,0.15);
+}

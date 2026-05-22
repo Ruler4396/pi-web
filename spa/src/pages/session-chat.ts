@@ -5,6 +5,7 @@ import { ChatPanel } from "@earendil-works/pi-web-ui";
 import { HttpAgent } from "../http-agent";
 import { notify, getNotifySettings, setNotifySettings, requestBrowserPermission } from "../notifications";
 import { renderDiff } from "../diff";
+import { setupToolRenderers } from "../tool-renderers";
 
 const THEME_KEY = "pi-theme";
 
@@ -77,6 +78,11 @@ export class SessionChat extends LitElement {
   @state() diffContent = "";
   @state() diffLoading = false;
   _gitInterval: any = null;
+  @state() runningTools: string[] = [];
+  @state() showNewFileDialog = false;
+  @state() newFileName = "";
+  _msgObserver: MutationObserver | null = null;
+  _knownMessages = new WeakSet<Element>();
   @state() showContextDetail = false; contextTokens = 0; contextMax = 1048576; // DeepSeek V4 1M context
   @state() apiKeys: Record<string, string> = {};
   _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
@@ -172,6 +178,13 @@ export class SessionChat extends LitElement {
     document.addEventListener("click", (_e: Event) => {
       if (this.contextMenuVisible) { this.contextMenuVisible = false; this.requestUpdate(); }
     });
+    this.addEventListener("toast", ((e: CustomEvent) => {
+      if (e.detail?.text) this.showToast("info", e.detail.text);
+    }) as EventListener);
+    this.addEventListener("file-reverted", (() => {
+      this.fetchGitStatus();
+      if (this.showGitDiff) this.fetchGitDiff();
+    }) as EventListener);
   }
 
   disconnectedCallback() {
@@ -179,6 +192,7 @@ export class SessionChat extends LitElement {
     if (this._globalKeydown) document.removeEventListener("keydown", this._globalKeydown);
     clearInterval(this.msgInterval);
     clearInterval(this._gitInterval);
+    this._msgObserver?.disconnect();
     this.chatPanel?.remove();
     this.chatPanel = undefined;
     document.removeEventListener("dragover", this.onGlobalDragOver);
@@ -201,6 +215,15 @@ export class SessionChat extends LitElement {
             this.fetchGitStatus();
             if (this.showGitDiff) this.fetchGitDiff();
           }, 300);
+        }
+        this.runningTools = this.runningTools.filter(t => t !== event.toolName);
+        this.requestUpdate();
+      }
+      if (event.type === "tool_execution_start") {
+        const tn = event.toolName || "";
+        if (!this.runningTools.includes(tn)) {
+          this.runningTools = [...this.runningTools, tn];
+          this.requestUpdate();
         }
       }
     });
@@ -259,6 +282,8 @@ export class SessionChat extends LitElement {
         this.hasMessages = true; this.requestUpdate();
       }
     }, 500);
+    setupToolRenderers(this.sessionCwd);
+    this._setupMessageObserver();
     this.requestUpdate();
   }
 
@@ -296,15 +321,6 @@ export class SessionChat extends LitElement {
     localStorage.setItem("pi-current-thinking", level);
     this.requestUpdate();
   };
-  showToast(type: string, text: string) {
-    const id = Date.now();
-    this.toasts = [...this.toasts, { id, text, type }];
-    this.requestUpdate();
-    setTimeout(() => {
-      this.toasts = this.toasts.filter(t => t.id !== id);
-      this.requestUpdate();
-    }, 3500);
-  }
 
   async fetchGitStatus() {
     try {
@@ -366,6 +382,112 @@ export class SessionChat extends LitElement {
 
   getContextTokens(): number {
     return this.contextTokens > 0 ? this.contextTokens : this.estimateTokens();
+  }
+
+  private _setupMessageObserver() {
+    this._msgObserver?.disconnect();
+    this._msgObserver = new MutationObserver(() => {
+      this._injectMessageButtons();
+    });
+    const cp = this.chatPanel;
+    if (cp) {
+      this._msgObserver.observe(cp, { childList: true, subtree: true });
+    }
+  }
+
+  private _injectMessageButtons() {
+    if (!this.chatPanel) return;
+    const cp = this.chatPanel;
+    const userMessages = cp.querySelectorAll("user-message");
+    userMessages.forEach((el) => {
+      if (this._knownMessages.has(el)) return;
+      this._knownMessages.add(el);
+      const btn = document.createElement("button");
+      btn.className = "msg-edit-btn";
+      btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+      btn.title = "Edit message";
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const textEl = el.querySelector("markdown-block, p, .text-content");
+        let text = textEl?.textContent?.trim() || "";
+        if (!text) {
+          const allText = el.textContent?.trim() || "";
+          text = allText;
+        }
+        if (text && this.chatPanel?.agentInterface) {
+          this.chatPanel.agentInterface.setInput(text, []);
+        }
+      });
+      el.appendChild(btn);
+    });
+
+    const assistantMessages = cp.querySelectorAll("assistant-message");
+    const lastAm = assistantMessages[assistantMessages.length - 1];
+    if (lastAm && !this._knownMessages.has(lastAm)) {
+      this._knownMessages.add(lastAm);
+      const btn = document.createElement("button");
+      btn.className = "msg-regen-btn";
+      btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+      btn.title = "Regenerate response";
+      btn.addEventListener("click", async (_e) => {
+        const msgs = this.agent?.state.messages as any[];
+        if (!msgs || msgs.length < 2) return;
+        const lastUser = [...msgs].reverse().find((m: any) => m.role === "user");
+        if (!lastUser) return;
+        const text = Array.isArray(lastUser.content)
+          ? lastUser.content.map((c: any) => c.text || "").join("")
+          : String(lastUser.content || "");
+        if (text && this.chatPanel?.agentInterface) {
+          this.chatPanel.agentInterface.sendMessage(text);
+        }
+      });
+      lastAm.appendChild(btn);
+    }
+  }
+
+  toggleNewFileDialog() {
+    this.showNewFileDialog = !this.showNewFileDialog;
+    this.newFileName = "";
+    this.requestUpdate();
+  }
+
+  async createNewFile() {
+    const name = this.newFileName.trim();
+    if (!name) return;
+    const fullPath = this.sessionCwd.replace(/\/+$/, "") + "/" + name;
+    if (name.endsWith("/")) {
+      try {
+        await fetch("/api/shell/exec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command: `mkdir -p ${JSON.stringify(fullPath.slice(0, -1))}`, cwd: this.sessionCwd }),
+        });
+      } catch {}
+    } else {
+      try {
+        await fetch("/api/file/write", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: fullPath, content: "" }),
+        });
+      } catch {}
+    }
+    this.newFileName = "";
+    this.showNewFileDialog = false;
+    const ft = this.querySelector("file-tree") as any;
+    if (ft?.loadDir) { try { await ft.loadDir(this.sessionCwd); } catch(_) {} }
+    this.fetchGitStatus();
+    this.requestUpdate();
+  }
+
+  showToast(type: string, text: string) {
+    const id = Date.now();
+    this.toasts = [...this.toasts, { id, text, type }];
+    this.requestUpdate();
+    setTimeout(() => {
+      this.toasts = this.toasts.filter(t => t.id !== id);
+      this.requestUpdate();
+    }, 3500);
   }
 
   toggleCommitPanel() {
@@ -821,6 +943,12 @@ export class SessionChat extends LitElement {
           </a>
           <span class="divider">&#183;</span><span class="sid">${sid}</span>
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
+          ${this.runningTools.length > 0 ? html`
+            <div class="tool-indicator">
+              <span class="tool-spinner"></span>
+              <span class="tool-label">${this.runningTools[0]}</span>
+            </div>
+          ` : ""}
           <div style="flex:1"></div>
           ${this.modelSupportsThinking ? html`<div class="thinking-wrap" style="position:relative">
             <button class="thinking-pill thinking-${this.thinkingLevel}" @click=${this.toggleThinkingMenu} title="思考: ${this.thinkingLevel}">
@@ -1053,8 +1181,19 @@ export class SessionChat extends LitElement {
           <div class="sidebar" style="width:260px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-base);border-right:0.5px solid rgba(255,255,255,0.07);flex-shrink:0;position:relative">
             <div class="sidebar-header">
               <span style="font-size:12px;font-weight:500;color:var(--text-weak);letter-spacing:0.04em">FILES</span>
-              <file-upload></file-upload>
+              <div class="sidebar-header-actions">
+                <button class="file-action-btn" @click=${this.toggleNewFileDialog} title="New file/folder">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
+                <file-upload></file-upload>
+              </div>
             </div>
+            ${this.showNewFileDialog ? html`
+              <div class="new-file-dialog">
+                <input class="new-file-input" placeholder="filename.ts or folder/" .value=${this.newFileName} @input=${(e: InputEvent) => { this.newFileName = (e.target as HTMLInputElement).value; }} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") this.createNewFile(); if (e.key === "Escape") { this.showNewFileDialog = false; this.requestUpdate(); } }}>
+                <button class="file-action-btn primary" @click=${this.createNewFile} ?disabled=${!this.newFileName.trim()}>Create</button>
+              </div>
+            ` : ""}
             <file-tree rootpath=${this.sessionCwd} .gitStatus=${this.gitFiles} style="flex:1;overflow-y:auto;min-height:0;padding:4px 0"></file-tree>
             <div class="sidebar-footer">
               ${this.gitBranch ? html`
