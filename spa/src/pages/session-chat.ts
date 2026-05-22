@@ -52,7 +52,9 @@ export class SessionChat extends LitElement {
   @state() showAddModelDialog = false;
   @state() showSettings = false;
   @state() showShortcuts = false; @state() showConfig = false;
-  @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh", notifySound: true, notifyBrowser: false }; @state() showSlashCommands = false; @state() slashIdx = 0;
+  @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh", notifySound: true, notifyBrowser: false };   @state() showSlashCommands = false; @state() slashIdx = 0;
+  @state() allSessions: any[] = [];
+  @state() showSessionSwitcher = false;
   slashCommands = [
     { cmd: "/help", desc: "显示快捷键", action: "ui" },
     { cmd: "/clear", desc: "清空对话", action: "ui" },
@@ -139,6 +141,7 @@ export class SessionChat extends LitElement {
         if (this.showAddModelDialog) { this.showAddModelDialog = false; this.requestUpdate(); return; }
         if (this.showModelDropdown) { this.showModelDropdown = false; this.requestUpdate(); return; }
         if (this.showThinkingDropdown) { this.showThinkingDropdown = false; this.requestUpdate(); return; }
+        if (this.showSessionSwitcher) { this.showSessionSwitcher = false; this.requestUpdate(); return; }
       }
     };
     document.addEventListener("keydown", this._globalKeydown);
@@ -181,6 +184,8 @@ export class SessionChat extends LitElement {
     }) as EventListener);
     document.addEventListener("click", (_e: Event) => {
       if (this.contextMenuVisible) { this.contextMenuVisible = false; this.requestUpdate(); }
+      if (this.showSessionSwitcher) { this.showSessionSwitcher = false; this.requestUpdate(); }
+      if (this.showSlashCommands) { this.showSlashCommands = false; this.requestUpdate(); }
     });
     this.addEventListener("toast", ((e: CustomEvent) => {
       if (e.detail?.text) this.showToast("info", e.detail.text);
@@ -239,38 +244,33 @@ export class SessionChat extends LitElement {
       onApiKeyRequired: async () => true,
     });
 
-    // Hook slash command on message editor textarea
-    const installSlashHook = () => {
-      // ChatPanel uses light DOM, message-editor is nested under agent-interface
-      const cp = this.chatPanel;
-      const editor = (cp as any)?.querySelector("message-editor") || this.querySelector("message-editor");
-      if (!editor) { setTimeout(installSlashHook, 500); return; }
-      const ta = (editor as any).shadowRoot?.querySelector("textarea") || editor.querySelector("textarea");
-      if (!ta) { setTimeout(installSlashHook, 500); return; }
-      ta.addEventListener("input", (e: InputEvent) => {
-        const val = (e.target as HTMLTextAreaElement).value;
-        if (val === "/") { this.showSlashCommands = true; this.slashIdx = 0; this.requestUpdate(); }
-        else if (this.showSlashCommands && !val.startsWith("/")) { this.showSlashCommands = false; this.requestUpdate(); }
-        else if (this.showSlashCommands && val.length > 1) {
-          const q = val.slice(1).toLowerCase();
-          this.slashIdx = this.slashCommands.findIndex(c => c.cmd.startsWith("/" + q));
-          if (this.slashIdx < 0) this.slashIdx = 0;
-          this.requestUpdate();
-        }
-      });
-      ta.addEventListener("keydown", (e: KeyboardEvent) => {
-        if (!this.showSlashCommands) return;
-        if (e.key === "ArrowDown") { e.preventDefault(); this.slashIdx = (this.slashIdx + 1) % this.slashCommands.length; this.requestUpdate(); }
-        else if (e.key === "ArrowUp") { e.preventDefault(); this.slashIdx = (this.slashIdx - 1 + this.slashCommands.length) % this.slashCommands.length; this.requestUpdate(); }
-        else if (e.key === "Enter" && this.showSlashCommands) {
-          e.preventDefault();
-          const cmd = this.slashCommands[this.slashIdx];
-          if (cmd) { (e.target as HTMLTextAreaElement).value = cmd.cmd + " "; this.showSlashCommands = false; this.requestUpdate(); }
-        }
-        else if (e.key === "Escape") { this.showSlashCommands = false; this.requestUpdate(); }
-      });
-    };
-    setTimeout(installSlashHook, 1000);
+    // Hook slash command via event delegation — survives textarea re-renders
+    this.addEventListener("input", (e: Event) => {
+      const ta = e.target as HTMLTextAreaElement;
+      if (ta.tagName !== "TEXTAREA" || !ta.closest("message-editor")) return;
+      const val = ta.value;
+      if (val === "/") { this.showSlashCommands = true; this.slashIdx = 0; this.requestUpdate(); }
+      else if (this.showSlashCommands && !val.startsWith("/")) { this.showSlashCommands = false; this.requestUpdate(); }
+      else if (this.showSlashCommands && val.length > 1) {
+        const q = val.slice(1).toLowerCase();
+        this.slashIdx = this.slashCommands.findIndex(c => c.cmd.startsWith("/" + q));
+        if (this.slashIdx < 0) this.slashIdx = 0;
+        this.requestUpdate();
+      }
+    });
+    this.addEventListener("keydown", (e: KeyboardEvent) => {
+      const ta = e.target as HTMLTextAreaElement;
+      if (ta.tagName !== "TEXTAREA" || !ta.closest("message-editor")) return;
+      if (!this.showSlashCommands) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); this.slashIdx = (this.slashIdx + 1) % this.slashCommands.length; this.requestUpdate(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); this.slashIdx = (this.slashIdx - 1 + this.slashCommands.length) % this.slashCommands.length; this.requestUpdate(); }
+      else if (e.key === "Enter" && this.showSlashCommands) {
+        e.preventDefault();
+        const cmd = this.slashCommands[this.slashIdx];
+        if (cmd) { ta.value = cmd.cmd + " "; this.showSlashCommands = false; this.requestUpdate(); }
+      }
+      else if (e.key === "Escape") { this.showSlashCommands = false; this.requestUpdate(); }
+    });
     try {
       const res = await fetch("/api/session");
       if (res.ok) {
@@ -309,6 +309,17 @@ export class SessionChat extends LitElement {
     this.recentModels = filtered.slice(0, 5);
     localStorage.setItem("pi-current-model", JSON.stringify({ provider, id, label }));
     this.requestUpdate();
+  };
+  loadAllSessions = async () => {
+    try {
+      const res = await fetch("/api/session");
+      if (res.ok) this.allSessions = await res.json();
+    } catch {}
+  };
+  switchSession = async (id: string) => {
+    if (id === this.sessionId) { this.showSessionSwitcher = false; this.requestUpdate(); return; }
+    this.showSessionSwitcher = false;
+    window.location.hash = "#/chat/" + id;
   };
   deleteCustomModel = (provider: string, modelId: string, e: Event) => {
     e.stopPropagation();
@@ -1029,9 +1040,40 @@ export class SessionChat extends LitElement {
       <div class="chat-wrapper">
         <div class="topbar">
           <a class="back" href="#" @click=${(e: Event) => { e.preventDefault(); window.location.hash = ""; }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg> Sessions
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
           </a>
-          <span class="divider">&#183;</span><span class="sid">${sid}</span>
+          <div class="ss-wrap" style="position:relative">
+            <button class="ss-btn" @click=${(e: Event) => { e.stopPropagation(); this.loadAllSessions(); this.showSessionSwitcher = !this.showSessionSwitcher; this.requestUpdate(); }}>
+              <span class="ss-name">${sid.slice(0, 8)}</span>
+              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            ${this.showSessionSwitcher ? html`
+              <div class="ss-dropdown">
+                ${this.allSessions.length === 0 ? html`<div class="ss-empty">加载中...</div>` : ""}
+                ${(() => {
+                  const groups = new Map<string, any[]>();
+                  for (const s of this.allSessions) {
+                    const d = s.cwd || "其他";
+                    if (!groups.has(d)) groups.set(d, []);
+                    groups.get(d)!.push(s);
+                  }
+                  const sorted = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+                  return sorted.map(([dir, sessions]) => html`
+                    <div class="ss-group">
+                      <div class="ss-dir">${dir}</div>
+                      ${sessions.map(s => html`
+                        <div class="ss-session ${s.id === this.sessionId ? 'current' : ''}" @click=${() => this.switchSession(s.id)}>
+                          <span class="ss-dot ${s.active ? 'on' : 'off'}"></span>
+                          <span class="ss-sname">${s.name || s.id.slice(0, 8)}</span>
+                          <span class="ss-stat ${s.active ? 'on' : 'off'}">${s.active ? "活跃" : "空闲"}</span>
+                        </div>
+                      `)}
+                    </div>
+                  `);
+                })()}
+              </div>
+            ` : ""}
+          </div>
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
           ${this.runningTools.length > 0 ? html`
             <div class="tool-indicator">

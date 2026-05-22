@@ -46,6 +46,22 @@ impl SessionManager {
         Ok(agent)
     }
 
+    pub async fn create_file(&self, session_id: &str, cwd: Option<&str>) -> anyhow::Result<PathBuf> {
+        let session_file = self.session_path(session_id);
+        self.init_session_file(&session_file, session_id).await?;
+        if let Some(c) = cwd {
+            if let Ok(content) = tokio::fs::read_to_string(&session_file).await {
+                if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&content) {
+                    json["cwd"] = serde_json::Value::String(c.to_string());
+                    if let Ok(new_content) = serde_json::to_string(&json) {
+                        let _ = tokio::fs::write(&session_file, new_content + "\n").await;
+                    }
+                }
+            }
+        }
+        Ok(session_file)
+    }
+
     async fn init_session_file(&self, path: &std::path::Path, session_id: &str) -> anyhow::Result<()> {
         if path.exists() {
             return Ok(());
@@ -68,6 +84,10 @@ impl SessionManager {
         content.push('\n');
         tokio::fs::write(path, content).await?;
         Ok(())
+    }
+
+    pub async fn is_active(&self, session_id: &str) -> bool {
+        self.agents.read().await.contains_key(session_id)
     }
 
     pub async fn remove(&self, session_id: &str) {
