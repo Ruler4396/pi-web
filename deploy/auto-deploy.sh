@@ -8,13 +8,10 @@ TMPDIR="/tmp/pi-web-deploy-$$"
 
 # Check if there's a new release
 echo "==> Checking for new release..."
-RELEASE_JSON=$(curl -fsS "https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}" 2>/dev/null) || {
+RELEASE_TIME=$(gh release view "$RELEASE_TAG" --repo "$REPO" --json publishedAt --jq '.publishedAt' 2>/dev/null) || {
   echo "No latest-build release found (first build may still be running)"
   exit 0
 }
-
-RELEASE_TIME=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('published_at',''))")
-RELEASE_SHA=$(curl -fsS "https://api.github.com/repos/${REPO}/git/ref/tags/${RELEASE_TAG}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('object',{}).get('sha',''))")
 
 if [ -z "$RELEASE_TIME" ]; then
   echo "Could not determine release time"
@@ -34,17 +31,14 @@ else
 fi
 
 # Download asset
-ASSET_URL=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); print(assets[0]['browser_download_url'] if assets else '')")
-if [ -z "$ASSET_URL" ]; then
-  echo "No asset found in release"
-  exit 1
-fi
-
 mkdir -p "$TMPDIR"
 cd "$TMPDIR"
 
-echo "==> Downloading $(basename "$ASSET_URL")..."
-curl -fsSL -o pi-web.tar.gz "$ASSET_URL" || { echo "Download failed"; exit 1; }
+echo "==> Downloading release asset..."
+gh release download "$RELEASE_TAG" --repo "$REPO" --pattern 'pi-web.tar.gz' 2>/dev/null || {
+  echo "Download failed"
+  exit 1
+}
 
 echo "==> Extracting..."
 tar xzf pi-web.tar.gz
