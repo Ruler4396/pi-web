@@ -230,6 +230,23 @@ export class SessionChat extends LitElement {
     return this.slashCommands.filter(c => c.cmd.slice(1).toLowerCase().startsWith(q));
   }
 
+  private get _displayItems() {
+    const cmds = this._displayCommands;
+    if (!this._slashFilterText) {
+      const items: any[] = [];
+      let addedSection = false;
+      for (let i = 0; i < cmds.length; i++) {
+        if (cmds[i].action === "ai" && !addedSection) {
+          items.push({ _section: true });
+          addedSection = true;
+        }
+        items.push({ _idx: i, cmd: cmds[i] });
+      }
+      return items;
+    }
+    return cmds.map((c, i) => ({ _idx: i, cmd: c }));
+  }
+
   async initChat() {
     this.agent = new HttpAgent(this.sessionId);
     this.agent.subscribe((event: any) => {
@@ -1455,35 +1472,23 @@ export class SessionChat extends LitElement {
               ` : ""}
             </div>
             <div class="slash-dropdown ${this.showSlashCommands ? 'active' : ''}">
-              ${(() => {
-                const cmds = this._displayCommands;
-                const items: any[] = [];
-                let addedSection = false;
-                for (let i = 0; i < cmds.length; i++) {
-                  if (!this._slashFilterText && cmds[i].action === "ai" && !addedSection) {
-                    items.push({ _section: true });
-                    addedSection = true;
-                  }
-                  items.push({ _idx: i, cmd: cmds[i] });
-                }
-                return items.map(item => {
-                  if (item._section) return html`<div class="slash-section">AI 指令</div>`;
-                  const c = item.cmd;
-                  return html`
-                    <div class="slash-item${item._idx === this.slashIdx ? ' selected' : ''}" @click=${() => {
-                      const cp = this.chatPanel;
-                      const editor = (cp as any)?.querySelector("message-editor") || this.querySelector("message-editor");
-                      const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea");
-                      if (ta) { (ta as HTMLTextAreaElement).value = c.cmd + " "; ta.focus(); }
-                      this.showSlashCommands = false; this._slashFilterText = "";
-                      this.requestUpdate();
-                    }}>
-                      <span class="slash-label">${c.cmd}</span>
-                      <span class="slash-desc">${c.desc}</span>
-                      ${c.action === "ai" ? html`<span class="slash-badge">AI</span>` : ""}
-                    </div>`;
-                });
-              })()}
+              ${this._displayItems.map(item => {
+                if (item._section) return html`<div class="slash-section">AI 指令</div>`;
+                const c = item.cmd;
+                return html`
+                  <div class="slash-item${item._idx === this.slashIdx ? ' selected' : ''}" @click=${() => {
+                    const cp = this.chatPanel;
+                    const editor = (cp as any)?.querySelector("message-editor") || this.querySelector("message-editor");
+                    const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea");
+                    if (ta) { (ta as HTMLTextAreaElement).value = c.cmd + " "; ta.focus(); }
+                    this.showSlashCommands = false; this._slashFilterText = "";
+                    this.requestUpdate();
+                  }}>
+                    <span class="slash-label">${c.cmd}</span>
+                    <span class="slash-desc">${c.desc}</span>
+                    ${c.action === "ai" ? html`<span class="slash-badge">AI</span>` : ""}
+                  </div>`;
+              })}
             </div>
             ${this.chatPanel}
           </div>
