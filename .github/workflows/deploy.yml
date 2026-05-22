@@ -23,9 +23,7 @@ jobs:
 
       - name: Install SPA dependencies
         working-directory: spa
-        run: npm ci
-        env:
-          npm_config_registry: https://registry.npmjs.org/
+        run: npm ci --registry=https://registry.npmjs.org/
 
       - name: Type check
         working-directory: spa
