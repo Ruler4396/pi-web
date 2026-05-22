@@ -49,12 +49,15 @@ echo "==> Extracting..."
 tar xzf pi-web.tar.gz
 
 echo "==> Installing pi-web binary..."
-cp pi-web/pi-web /opt/pi/pi-web
-chmod +x /opt/pi/pi-web
+cp pi-web/pi-web /opt/pi/pi-web.new
+chmod +x /opt/pi/pi-web.new
+mv /opt/pi/pi-web.new /opt/pi/pi-web
 
 echo "==> Installing SPA dist..."
+rm -rf /opt/pi/spa-dist.new
+cp -r pi-web/spa-dist /opt/pi/spa-dist.new
 rm -rf /opt/pi/spa-dist
-cp -r pi-web/spa-dist /opt/pi/spa-dist
+mv /opt/pi/spa-dist.new /opt/pi/spa-dist
 
 # Cleanup
 cd /
