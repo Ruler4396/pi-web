@@ -186,14 +186,9 @@ export class SessionList extends LitElement {
   render() {
     return html`
       <div class="container" style="min-height:400px">
-        <div class="hero">
-          <div class="logo">${chatSvg}</div>
-          <h1>Pi Web</h1>
-          <p>AI coding assistant</p>
-        </div>
         <div class="actions">
           <button class="btn-new" @click=${this.openNewSessionDialog} ?disabled=${this.loading}>
-            ${plusSvg} New Session
+            ${plusSvg} 新建会话
           </button>
         </div>
         ${this.error ? html`<div class="error-msg">${this.error}</div>` : ""}
