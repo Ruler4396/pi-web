@@ -215,6 +215,15 @@ export class SessionChat extends LitElement {
     document.removeEventListener("drop", this.onGlobalDrop);
   }
 
+  updated(changedProperties: Map<string, unknown>) {
+    if ((changedProperties.has("showSlashCommands") || changedProperties.has("slashIdx")) && this.showSlashCommands) {
+      requestAnimationFrame(() => {
+        const sel = this.querySelector(".slash-item.selected");
+        sel?.scrollIntoView({ block: "nearest" });
+      });
+    }
+  }
+
   private get _displayCommands() {
     const q = this._slashFilterText.slice(1).toLowerCase();
     if (!q) return this.slashCommands;
