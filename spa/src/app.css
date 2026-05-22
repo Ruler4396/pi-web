@@ -859,3 +859,80 @@ assistant-message:hover .msg-regen-btn {
 [data-theme="dark"] .msg-edit-btn:hover, [data-theme="dark"] .msg-regen-btn:hover {
   background: rgba(37,99,235,0.15);
 }
+
+/* Search bar in sidebar */
+.search-bar {
+  border-bottom: 0.5px solid rgba(255,255,255,0.05);
+}
+.search-input {
+  width: 100%; padding: 5px 8px; font-size: 12px; border: none;
+  background: transparent; color: var(--text-base);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  outline: none;
+}
+.search-input::placeholder { color: var(--text-weaker); }
+.search-results {
+  max-height: 240px; overflow-y: auto; display: none;
+}
+.search-results.active {
+  display: block;
+}
+.search-result {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px; font-size: 11px; cursor: pointer;
+  white-space: nowrap; overflow: hidden;
+}
+.search-result:hover { background: rgba(37,99,235,0.06); }
+.sr-file { color: #2563eb; font-weight: 500; flex-shrink: 0; }
+.sr-line { color: var(--text-weaker); flex-shrink: 0; }
+.sr-text { color: var(--text-weaker); overflow: hidden; text-overflow: ellipsis; }
+.search-loading { padding: 8px; color: var(--text-weaker); font-size: 11px; text-align: center; }
+.search-more { padding: 4px 8px; font-size: 10px; color: var(--text-weaker); text-align: center; }
+
+/* Context bar compaction warning */
+.context-bar.ctx-crit .context-bar-fill.ctx-warn {
+  background: linear-gradient(90deg, rgba(239,68,68,0.1), rgba(239,68,68,0.25)) !important;
+  border-right-color: rgba(239,68,68,0.4) !important;
+  animation: ctx-pulse 2s ease-in-out infinite;
+}
+@keyframes ctx-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.ctx-compact-hint {
+  position: relative; z-index: 1;
+  margin-left: auto; padding: 0 6px;
+  font-size: 9px; font-weight: 600; cursor: pointer;
+  background: rgba(239,68,68,0.12); color: #ef4444;
+  border-radius: 3px; white-space: nowrap;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  line-height: 16px;
+}
+.ctx-compact-hint:hover { background: rgba(239,68,68,0.2); }
+
+/* Git file list in diff panel */
+.git-file-list {
+  padding: 4px 0; margin-bottom: 8px;
+  border-bottom: 0.5px solid rgba(255,255,255,0.06);
+}
+.git-file-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 4px; font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.git-file-status { font-size: 9px; font-weight: 600; padding: 0 3px; border-radius: 2px; flex-shrink: 0; }
+.git-file-status.git-modified { color: #eab308; background: rgba(234,179,8,0.1); }
+.git-file-status.git-added { color: #22c55e; background: rgba(34,197,94,0.1); }
+.git-file-status.git-deleted { color: #ef4444; background: rgba(239,68,68,0.1); }
+.git-file-status.git-untracked { color: #22c55e; background: rgba(34,197,94,0.1); }
+.git-file-path { flex: 1; overflow: hidden; text-overflow: ellipsis; color: var(--text-base); }
+.git-file-undo {
+  padding: 1px 6px; font-size: 10px; border: none; border-radius: 3px;
+  background: rgba(239,68,68,0.08); color: #ef4444; cursor: pointer;
+  font-family: ui-sans-serif, system-ui, sans-serif; flex-shrink: 0;
+}
+.git-file-undo:hover { background: rgba(239,68,68,0.2); }
+.terminal-action-btn.undo-all {
+  background: rgba(239,68,68,0.08); color: #ef4444;
+}
+.terminal-action-btn.undo-all:hover { background: rgba(239,68,68,0.2); }

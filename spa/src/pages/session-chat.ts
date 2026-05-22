@@ -69,6 +69,10 @@ export class SessionChat extends LitElement {
     { cmd: "/btw", desc: "临时提问，不污染对话", action: "ai" },
   ];
   @state() toasts: {id: number, text: string, type: string}[] = [];
+  @state() showSearch = false;
+  @state() searchQuery = "";
+  @state() searchResults: {file: string, line: number, content: string}[] = [];
+  @state() searchLoading = false;
   @state() gitBranch = "";
   @state() gitClean = true;
   @state() gitFiles: Record<string, string> = {};
@@ -488,6 +492,92 @@ export class SessionChat extends LitElement {
       this.toasts = this.toasts.filter(t => t.id !== id);
       this.requestUpdate();
     }, 3500);
+  }
+
+  toggleSearch() {
+    this.showSearch = !this.showSearch;
+    if (!this.showSearch) { this.searchQuery = ""; this.searchResults = []; }
+    this.requestUpdate();
+    if (this.showSearch) {
+      setTimeout(() => {
+        const input = this.querySelector(".search-input") as HTMLInputElement;
+        input?.focus();
+      }, 100);
+    }
+  }
+
+  async doSearch() {
+    const q = this.searchQuery.trim();
+    if (!q || q.length < 2) { this.searchResults = []; this.requestUpdate(); return; }
+    this.searchLoading = true;
+    this.requestUpdate();
+    try {
+      const res = await fetch("/api/shell/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command: `grep -rn --color=never -I ${JSON.stringify(q)} . 2>/dev/null | head -200`,
+          cwd: this.sessionCwd,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const lines = (data.stdout || "").split("\n").filter((l: string) => l.trim());
+        this.searchResults = lines.map((l: string) => {
+          const m = l.match(/^([^:]+):(\d+):(.*)$/);
+          return m ? { file: m[1], line: parseInt(m[2]), content: m[3] } : { file: l, line: 0, content: "" };
+        }).filter((r: any) => r.file !== "." && !r.file.startsWith("./."));
+      }
+    } catch {}
+    this.searchLoading = false;
+    this.requestUpdate();
+  }
+
+  searchResultClick(file: string, line: number) {
+    const name = file.split("/").pop() || file;
+    this.toggleFileTab(file, name);
+    this.showSearch = false;
+    this.requestUpdate();
+  }
+
+  async undoFile(filePath: string) {
+    try {
+      const res = await fetch("/api/shell/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command: `git checkout -- ${JSON.stringify(filePath)}`,
+          cwd: this.sessionCwd,
+        }),
+      });
+      if (res.ok) {
+        this.showToast("info", "Reverted: " + filePath);
+        this.fetchGitStatus();
+        if (this.showGitDiff) this.fetchGitDiff();
+        const ft = this.querySelector("file-tree") as any;
+        if (ft?.loadDir) ft.loadDir(this.sessionCwd).catch(() => {});
+      }
+    } catch {}
+  }
+
+  async undoAll() {
+    try {
+      const res = await fetch("/api/shell/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          command: "git checkout -- . 2>/dev/null; git clean -fd 2>/dev/null",
+          cwd: this.sessionCwd,
+        }),
+      });
+      if (res.ok) {
+        this.showToast("info", "All changes reverted");
+        this.fetchGitStatus();
+        if (this.showGitDiff) this.fetchGitDiff();
+        const ft = this.querySelector("file-tree") as any;
+        if (ft?.loadDir) ft.loadDir(this.sessionCwd).catch(() => {});
+      }
+    } catch {}
   }
 
   toggleCommitPanel() {
@@ -1182,12 +1272,33 @@ export class SessionChat extends LitElement {
             <div class="sidebar-header">
               <span style="font-size:12px;font-weight:500;color:var(--text-weak);letter-spacing:0.04em">FILES</span>
               <div class="sidebar-header-actions">
+                <button class="file-action-btn" @click=${this.toggleSearch} title="Search in files">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                </button>
                 <button class="file-action-btn" @click=${this.toggleNewFileDialog} title="New file/folder">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
                 <file-upload></file-upload>
               </div>
             </div>
+            ${this.showSearch ? html`
+              <div class="search-bar">
+                <input class="search-input" placeholder="Search files..." .value=${this.searchQuery} @input=${(e: InputEvent) => { this.searchQuery = (e.target as HTMLInputElement).value; }} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") this.doSearch(); if (e.key === "Escape") { this.showSearch = false; this.requestUpdate(); } }}>
+                <div class="search-results ${this.searchResults.length > 0 || this.searchLoading ? 'active' : ''}">
+                  ${this.searchLoading ? html`<div class="search-loading">Searching...</div>` : ""}
+                  ${this.searchResults.length > 0 ? html`
+                    ${this.searchResults.slice(0, 80).map((r: any) => html`
+                      <div class="search-result" @click=${() => this.searchResultClick(r.file, r.line)}>
+                        <span class="sr-file">${r.file}</span>
+                        <span class="sr-line">:${r.line}</span>
+                        <span class="sr-text">${r.content.slice(0, 100)}</span>
+                      </div>
+                    `)}
+                    ${this.searchResults.length > 80 ? html`<div class="search-more">... ${this.searchResults.length - 80} more results</div>` : ""}
+                  ` : ""}
+                </div>
+              </div>
+            ` : ""}
             ${this.showNewFileDialog ? html`
               <div class="new-file-dialog">
                 <input class="new-file-input" placeholder="filename.ts or folder/" .value=${this.newFileName} @input=${(e: InputEvent) => { this.newFileName = (e.target as HTMLInputElement).value; }} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") this.createNewFile(); if (e.key === "Escape") { this.showNewFileDialog = false; this.requestUpdate(); } }}>
@@ -1243,9 +1354,10 @@ export class SessionChat extends LitElement {
                 </div>
               </div>
             ` : ""}
-            <div class="context-bar" @click=${() => { this.showContextDetail = !this.showContextDetail; this.requestUpdate(); }}>
+            <div class="context-bar ${this.getContextPercentage() > 0.8 ? 'ctx-crit' : ''} ${this.getContextPercentage() > 0.95 ? 'ctx-danger' : ''}" @click=${() => { this.showContextDetail = !this.showContextDetail; this.requestUpdate(); }}>
               <div class="context-bar-fill ${this.getContextPercentage() > 0.8 ? 'ctx-warn' : ''}" style="width:${Math.min(100, this.getContextPercentage() * 100)}%"></div>
               <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.getContextTokens().toLocaleString()} / ${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</span>
+              ${this.getContextPercentage() > 0.85 ? html`<span class="ctx-compact-hint" @click=${(e: Event) => { e.stopPropagation(); if (this.chatPanel?.agentInterface) { const editor = this.chatPanel.querySelector("message-editor"); const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea"); if (ta) { (ta as HTMLTextAreaElement).value = "/compact "; ta.focus(); } } }}>Compact</span>` : ""}
               ${this.showContextDetail ? html`
                 <div class="context-detail">
                   <div class="ctx-detail-row"><span>已用 token</span><span>${this.getContextTokens().toLocaleString()}</span></div>
@@ -1290,6 +1402,7 @@ export class SessionChat extends LitElement {
               </span>
               <div class="git-panel-actions">
                 ${!this.gitClean ? html`<button class="terminal-action-btn" @click=${() => { fetch("/api/shell/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "git add -A", cwd: this.sessionCwd }) }).then(() => { this.fetchGitStatus(); this.fetchGitDiff(); }); }}>Stage All</button>` : ""}
+                ${!this.gitClean ? html`<button class="terminal-action-btn undo-all" @click=${this.undoAll}>Undo All</button>` : ""}
                 <button class="close-btn" @click=${() => { this.showGitDiff = false; this.requestUpdate(); }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
@@ -1297,6 +1410,17 @@ export class SessionChat extends LitElement {
             </div>
             <div class="git-panel-body">
               ${this.diffLoading ? html`<div class="spinner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"></div>` : ""}
+              ${Object.keys(this.gitFiles).length > 0 ? html`
+                <div class="git-file-list">
+                  ${Object.entries(this.gitFiles).map(([path, status]) => html`
+                    <div class="git-file-item">
+                      <span class="git-file-status git-${status}">${status.charAt(0).toUpperCase() + status.slice(1)}</span>
+                      <span class="git-file-path">${path}</span>
+                      <button class="git-file-undo" @click=${() => this.undoFile(path)} title="Undo this file">Undo</button>
+                    </div>
+                  `)}
+                </div>
+              ` : ""}
               ${this.diffContent ? html`<pre class="diff-view">${unsafeHTML(renderDiff(this.diffContent))}</pre>` : html`<div class="diff-empty">No changes</div>`}
             </div>
           </div>

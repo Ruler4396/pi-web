@@ -132,16 +132,19 @@ impl SessionManager {
                 .unwrap_or("unknown")
                 .to_string();
             let active = self.agents.read().await.contains_key(&sid);
-            let cwd = if let Ok(content) = std::fs::read_to_string(&path) {
-                content.lines().next()
-                    .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-                    .and_then(|v| v.get("cwd").and_then(|c| c.as_str().map(String::from)))
-            } else { None };
+            let (cwd, name) = if let Ok(content) = std::fs::read_to_string(&path) {
+                let parsed = content.lines().next()
+                    .and_then(|line| serde_json::from_str::<serde_json::Value>(line).ok());
+                let c = parsed.as_ref().and_then(|v| v.get("cwd").and_then(|c| c.as_str().map(String::from)));
+                let n = parsed.as_ref().and_then(|v| v.get("name").and_then(|n| n.as_str().map(String::from)));
+                (c, n)
+            } else { (None, None) };
             sessions.push(SessionInfo {
                 id: sid,
                 file: path.display().to_string(),
                 active,
                 cwd,
+                name,
             });
         }
 
@@ -162,6 +165,8 @@ pub struct SessionInfo {
     pub active: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cwd: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
 }
 
 
