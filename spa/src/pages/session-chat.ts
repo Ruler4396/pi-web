@@ -92,6 +92,7 @@ export class SessionChat extends LitElement {
   @state() showContextDetail = false; contextTokens = 0; contextMax = 1048576; // DeepSeek V4 1M context
   @state() apiKeys: Record<string, string> = {};
   _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
+  _slashInput: any = null; _slashKeydown: any = null;
   recentModels: {provider: string, id: string, label: string, thinking: boolean, builtin: boolean}[] = [];
   @state() addModelForm = { provider: "", id: "", label: "", apiKey: "", baseUrl: "", thinking: false };
   @state() private terminalContent = "";
@@ -199,6 +200,8 @@ export class SessionChat extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     if (this._globalKeydown) document.removeEventListener("keydown", this._globalKeydown);
+    if (this._slashInput) document.removeEventListener("input", this._slashInput);
+    if (this._slashKeydown) document.removeEventListener("keydown", this._slashKeydown);
     clearInterval(this.msgInterval);
     clearInterval(this._gitInterval);
     this._msgObserver?.disconnect();
@@ -244,10 +247,10 @@ export class SessionChat extends LitElement {
       onApiKeyRequired: async () => true,
     });
 
-    // Hook slash command via event delegation — survives textarea re-renders
-    this.addEventListener("input", (e: Event) => {
+    // Hook slash command — event delegation on document to survive Shadow DOM
+    this._slashInput = (e: Event) => {
       const ta = e.target as HTMLTextAreaElement;
-      if (ta.tagName !== "TEXTAREA" || !ta.closest("message-editor")) return;
+      if (ta.tagName !== "TEXTAREA") return;
       const val = ta.value;
       if (val === "/") { this.showSlashCommands = true; this.slashIdx = 0; this.requestUpdate(); }
       else if (this.showSlashCommands && !val.startsWith("/")) { this.showSlashCommands = false; this.requestUpdate(); }
@@ -257,10 +260,10 @@ export class SessionChat extends LitElement {
         if (this.slashIdx < 0) this.slashIdx = 0;
         this.requestUpdate();
       }
-    });
-    this.addEventListener("keydown", (e: KeyboardEvent) => {
+    };
+    this._slashKeydown = (e: KeyboardEvent) => {
       const ta = e.target as HTMLTextAreaElement;
-      if (ta.tagName !== "TEXTAREA" || !ta.closest("message-editor")) return;
+      if (ta.tagName !== "TEXTAREA") return;
       if (!this.showSlashCommands) return;
       if (e.key === "ArrowDown") { e.preventDefault(); this.slashIdx = (this.slashIdx + 1) % this.slashCommands.length; this.requestUpdate(); }
       else if (e.key === "ArrowUp") { e.preventDefault(); this.slashIdx = (this.slashIdx - 1 + this.slashCommands.length) % this.slashCommands.length; this.requestUpdate(); }
@@ -270,7 +273,9 @@ export class SessionChat extends LitElement {
         if (cmd) { ta.value = cmd.cmd + " "; this.showSlashCommands = false; this.requestUpdate(); }
       }
       else if (e.key === "Escape") { this.showSlashCommands = false; this.requestUpdate(); }
-    });
+    };
+    document.addEventListener("input", this._slashInput);
+    document.addEventListener("keydown", this._slashKeydown);
     try {
       const res = await fetch("/api/session");
       if (res.ok) {
