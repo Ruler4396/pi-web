@@ -13,23 +13,24 @@ RELEASE_JSON=$(curl -fsS "https://api.github.com/repos/${REPO}/releases/tags/${R
   exit 0
 }
 
-RELEASE_SHA=$(echo "$RELEASE_JSON" | grep -o '"target_commitish": "[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"/\1/')
+RELEASE_TIME=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('published_at',''))")
+RELEASE_SHA=$(curl -fsS "https://api.github.com/repos/${REPO}/git/ref/tags/${RELEASE_TAG}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('object',{}).get('sha',''))")
 
-if [ -z "$RELEASE_SHA" ]; then
-  echo "Could not determine release commit SHA"
+if [ -z "$RELEASE_TIME" ]; then
+  echo "Could not determine release time"
   exit 1
 fi
 
-# Compare with last deployed SHA
+# Compare with last deployed time
 if [ -f "$SHA_FILE" ]; then
-  LAST_SHA=$(cat "$SHA_FILE")
-  if [ "$LAST_SHA" = "$RELEASE_SHA" ]; then
-    echo "Already on latest commit ($RELEASE_SHA)"
+  LAST_TIME=$(cat "$SHA_FILE")
+  if [ "$LAST_TIME" = "$RELEASE_TIME" ]; then
+    echo "Already on latest release ($RELEASE_TIME)"
     exit 0
   fi
-  echo "New release available: $LAST_SHA -> $RELEASE_SHA"
+  echo "New release available: $LAST_TIME -> $RELEASE_TIME"
 else
-  echo "First deploy: $RELEASE_SHA"
+  echo "First deploy: $RELEASE_TIME"
 fi
 
 # Download asset
@@ -69,8 +70,8 @@ sleep 2
 
 # Verify
 if systemctl is-active --quiet pi-web; then
-  echo "$RELEASE_SHA" > "$SHA_FILE"
-  echo "==> Deploy successful: $RELEASE_SHA"
+  echo "$RELEASE_TIME" > "$SHA_FILE"
+  echo "==> Deploy successful: $RELEASE_TIME"
   systemctl status pi-web --no-pager | head -5
 else
   echo "==> ERROR: pi-web service failed to start!"
