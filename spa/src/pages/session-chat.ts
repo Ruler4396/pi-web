@@ -216,12 +216,41 @@ export class SessionChat extends LitElement {
   }
 
   updated(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has("showSlashCommands")) {
+      if (this.showSlashCommands) {
+        this._positionSlashDropdown();
+      } else {
+        const d = this.querySelector(".slash-dropdown") as HTMLElement | null;
+        if (d) { d.style.top = ""; d.style.bottom = ""; }
+      }
+    }
     if ((changedProperties.has("showSlashCommands") || changedProperties.has("slashIdx")) && this.showSlashCommands) {
       requestAnimationFrame(() => {
         const sel = this.querySelector(".slash-item.selected");
         sel?.scrollIntoView({ block: "nearest" });
       });
     }
+  }
+
+  private _findTextarea(): HTMLTextAreaElement | null {
+    const cp = this.chatPanel;
+    if (!cp) return null;
+    const editor = (cp as any).querySelector("message-editor") || this.querySelector("message-editor");
+    if (!editor) return null;
+    return (editor as any).shadowRoot?.querySelector("textarea") || editor.querySelector("textarea");
+  }
+
+  private _positionSlashDropdown() {
+    const dropdown = this.querySelector(".slash-dropdown") as HTMLElement | null;
+    const ta = this._findTextarea();
+    if (!dropdown || !ta) return;
+    const container = dropdown.offsetParent as HTMLElement | null;
+    if (!container) return;
+    const taRect = ta.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const gap = 8;
+    dropdown.style.top = (taRect.top - containerRect.top - dropdown.offsetHeight - gap) + "px";
+    dropdown.style.bottom = "auto";
   }
 
   private get _displayCommands() {
@@ -1477,10 +1506,8 @@ export class SessionChat extends LitElement {
                 const c = item.cmd;
                 return html`
                   <div class="slash-item${item._idx === this.slashIdx ? ' selected' : ''}" @click=${() => {
-                    const cp = this.chatPanel;
-                    const editor = (cp as any)?.querySelector("message-editor") || this.querySelector("message-editor");
-                    const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea");
-                    if (ta) { (ta as HTMLTextAreaElement).value = c.cmd + " "; ta.focus(); }
+                    const ta = this._findTextarea();
+                    if (ta) { ta.value = c.cmd + " "; ta.focus(); }
                     this.showSlashCommands = false; this._slashFilterText = "";
                     this.requestUpdate();
                   }}>
