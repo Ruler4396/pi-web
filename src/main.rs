@@ -47,6 +47,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/file/download", get(api::file::download))
         .route("/api/file/write", axum::routing::post(api::file::write_file))
         .route("/api/file/delete", axum::routing::post(api::file::delete_file))
+        .route("/api/git/status", get(api::git::status))
+        .route("/api/git/diff", get(api::git::diff))
         .route("/api/shell/exec", axum::routing::post(api::shell::exec))
         .route("/api/models", get(api::session::models))
         .route("/api/keys", get(api::session::get_keys).post(api::session::save_keys))

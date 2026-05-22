@@ -24,6 +24,7 @@ const extColors: Record<string, string> = {
 @customElement("file-tree")
 export class FileTree extends LitElement {
   @property() rootPath = "/root";
+  @property({ type: Object }) gitStatus: Record<string, string> = {};
   @state() nodes: FileNode[] = [];
   @state() private expanded = new Set<string>();
   @state() private selected: string | null = null;
@@ -42,6 +43,11 @@ export class FileTree extends LitElement {
     .children { padding-left: 16px; }
     .loading-text { padding: 8px; color: var(--text-weaker, #b0b0b0); font-size: 12px; }
     .empty-text { padding: 8px; color: var(--text-weaker, #b0b0b0); font-size: 12px; }
+    .git-mod { color: #eab308; }
+    .git-add { color: #22c55e; }
+    .git-del { color: #ef4444; }
+    .git-ren { color: #8b5cf6; }
+    .git-unt { color: #22c55e; }
   `;
 
   createRenderRoot() { return this; }
@@ -128,12 +134,14 @@ export class FileTree extends LitElement {
     const isExpanded = this.expanded.has(node.path);
     const isSelected = this.selected === node.path;
     const isDir = node.type === "directory";
+    const gs = this.gitStatus[node.path] || "";
+    const gitCls = gs ? `git-${gs}` : "";
     return html`
       <div class="tree-node ${isSelected ? "selected" : ""}"
            @click=${(e: Event) => this.select(node, e)}
            @contextmenu=${(e: MouseEvent) => this.contextMenu(node, e)}>
-        <span class="icon">${isDir ? (isExpanded ? folderOpenSvg : folderSvg) : fileSvg}</span>
-        <span class="name">${node.name}</span>
+        <span class="icon ${gitCls}">${isDir ? (isExpanded ? folderOpenSvg : folderSvg) : fileSvg}</span>
+        <span class="name ${gitCls}">${node.name}</span>
         ${isDir ? "" : this.extBadge(node.name)}
         ${node.size ? html`<span class="size">${this.formatSize(node.size)}</span>` : ""}
       </div>

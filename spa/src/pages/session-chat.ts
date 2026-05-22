@@ -3,6 +3,8 @@ import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { ChatPanel } from "@earendil-works/pi-web-ui";
 import { HttpAgent } from "../http-agent";
+import { notify, getNotifySettings, setNotifySettings, requestBrowserPermission } from "../notifications";
+import { renderDiff } from "../diff";
 
 const THEME_KEY = "pi-theme";
 
@@ -49,7 +51,7 @@ export class SessionChat extends LitElement {
   @state() showAddModelDialog = false;
   @state() showSettings = false;
   @state() showShortcuts = false; @state() showConfig = false;
-  @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh" }; @state() showSlashCommands = false; @state() slashIdx = 0;
+  @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh", notifySound: true, notifyBrowser: false }; @state() showSlashCommands = false; @state() slashIdx = 0;
   slashCommands = [
     { cmd: "/help", desc: "显示快捷键", action: "ui" },
     { cmd: "/clear", desc: "清空对话", action: "ui" },
@@ -66,6 +68,15 @@ export class SessionChat extends LitElement {
     { cmd: "/btw", desc: "临时提问，不污染对话", action: "ai" },
   ];
   @state() toasts: {id: number, text: string, type: string}[] = [];
+  @state() gitBranch = "";
+  @state() gitClean = true;
+  @state() gitFiles: Record<string, string> = {};
+  @state() showGitDiff = false;
+  @state() showCommitPanel = false;
+  @state() commitMsg = "";
+  @state() diffContent = "";
+  @state() diffLoading = false;
+  _gitInterval: any = null;
   @state() showContextDetail = false; contextTokens = 0; contextMax = 1048576; // DeepSeek V4 1M context
   @state() apiKeys: Record<string, string> = {};
   _newKeyName = ""; _newKeyValue = ""; _globalKeydown: any = null; _ctxInterval: any = null;
@@ -167,6 +178,7 @@ export class SessionChat extends LitElement {
     super.disconnectedCallback();
     if (this._globalKeydown) document.removeEventListener("keydown", this._globalKeydown);
     clearInterval(this.msgInterval);
+    clearInterval(this._gitInterval);
     this.chatPanel?.remove();
     this.chatPanel = undefined;
     document.removeEventListener("dragover", this.onGlobalDragOver);
@@ -176,6 +188,22 @@ export class SessionChat extends LitElement {
 
   async initChat() {
     this.agent = new HttpAgent(this.sessionId);
+    this.agent.subscribe((event: any) => {
+      if (event.type === "agent_end" && event.messages?.length) {
+        const lastMsg = event.messages[event.messages.length - 1];
+        const text = lastMsg?.content?.map?.((c: any) => c.text || "").join("")?.slice(0, 100) || "";
+        notify("Pi Agent", text || "Task completed");
+      }
+      if (event.type === "tool_execution_end") {
+        const tn = (event.toolName || "").toLowerCase();
+        if (tn === "write_file" || tn === "write" || tn === "edit_file" || tn === "edit" || tn === "bash") {
+          setTimeout(() => {
+            this.fetchGitStatus();
+            if (this.showGitDiff) this.fetchGitDiff();
+          }, 300);
+        }
+      }
+    });
     this.chatPanel = new ChatPanel();
     this.chatPanel.style.display = "flex"; this.chatPanel.style.flexDirection = "column";
     this.chatPanel.style.flex = "1"; this.chatPanel.style.minHeight = "0";
@@ -224,6 +252,8 @@ export class SessionChat extends LitElement {
         if (s?.cwd) { this.sessionCwd = s.cwd; this.terminalCwd = s.cwd; }
       }
     } catch {}
+    this.fetchGitStatus();
+    this._gitInterval = window.setInterval(() => this.fetchGitStatus(), 10000);
     this.msgInterval = window.setInterval(() => {
       if (this.agent && this.agent.state.messages.length > 0 && !this.hasMessages) {
         this.hasMessages = true; this.requestUpdate();
@@ -276,6 +306,96 @@ export class SessionChat extends LitElement {
     }, 3500);
   }
 
+  async fetchGitStatus() {
+    try {
+      const res = await fetch("/api/git/status?cwd=" + encodeURIComponent(this.sessionCwd));
+      if (res.ok) {
+        const data = await res.json();
+        this.gitBranch = data.branch || "";
+        this.gitClean = data.clean !== false;
+        const map: Record<string, string> = {};
+        if (data.files) {
+          for (const f of data.files) {
+            map[f.path] = f.status;
+          }
+        }
+        this.gitFiles = map;
+      }
+    } catch {}
+  }
+
+  async fetchGitDiff() {
+    this.diffContent = "";
+    this.diffLoading = true;
+    this.requestUpdate();
+    try {
+      const res = await fetch("/api/git/diff?cwd=" + encodeURIComponent(this.sessionCwd));
+      if (res.ok) {
+        const data = await res.json();
+        this.diffContent = data.diff || "";
+      }
+    } catch {}
+    this.diffLoading = false;
+    this.requestUpdate();
+  }
+
+  toggleGitDiff() {
+    this.showGitDiff = !this.showGitDiff;
+    this.showCommitPanel = false;
+    if (this.showGitDiff) this.fetchGitDiff();
+    this.requestUpdate();
+  }
+
+  estimateTokens(): number {
+    let chars = 0;
+    if (this.agent) {
+      for (const msg of this.agent.state.messages as any[]) {
+        const content = Array.isArray(msg.content)
+          ? msg.content.map((c: any) => c.text || c.thinking || "").join("")
+          : String(msg.content || "");
+        chars += content.length;
+      }
+    }
+    return Math.ceil(chars / 3);
+  }
+
+  getContextPercentage(): number {
+    const tokens = this.estimateTokens();
+    return this.contextMax > 0 ? tokens / this.contextMax : 0;
+  }
+
+  getContextTokens(): number {
+    return this.contextTokens > 0 ? this.contextTokens : this.estimateTokens();
+  }
+
+  toggleCommitPanel() {
+    this.showCommitPanel = !this.showCommitPanel;
+    this.showGitDiff = false;
+    if (this.showCommitPanel) this.fetchGitDiff();
+    this.requestUpdate();
+  }
+
+  async doCommit() {
+    if (!this.commitMsg.trim()) return;
+    const cmd = "git add -A && git commit -m " + JSON.stringify(this.commitMsg) + " && git push";
+    try {
+      const res = await fetch("/api/shell/exec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: cmd, cwd: this.sessionCwd }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        this.terminalContent += this.sessionCwd + " $ git commit && git push\n" + (data.stdout || "") + (data.stderr || "") + "\n";
+        this.commitMsg = "";
+        this.showCommitPanel = false;
+        this.fetchGitStatus();
+        this.requestUpdate();
+        this.showToast("info", "Committed & pushed");
+      }
+    } catch {}
+  }
+
   handleCommand(cmd: string) {
     var c = cmd.trim().toLowerCase();
     if (c === "/help") { this.showShortcuts = true; this.requestUpdate(); return; }
@@ -306,24 +426,30 @@ export class SessionChat extends LitElement {
     this.showConfig = !this.showConfig;
     if (this.showConfig) {
       try { const r = await fetch("/api/config"); this.piConfig = await r.json(); } catch {}
+      const ns = getNotifySettings();
+      this.piConfig = { ...this.piConfig, notifySound: ns.sound, notifyBrowser: ns.browser };
     }
     this.requestUpdate();
   };
   saveConfig = async () => {
     await fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(this.piConfig) });
+    setNotifySettings({ sound: this.piConfig.notifySound, browser: this.piConfig.notifyBrowser });
+    const { notifySound: _, notifyBrowser: __, ...serverConfig } = this.piConfig;
     // Apply theme
-    const t = this.piConfig.theme;
+    const t = serverConfig.theme;
     this.theme = t === "dark" ? "dark" : "";
     document.documentElement.dataset.theme = t === "dark" ? "dark" : "light";
     localStorage.setItem("pi-theme", t);
     // Apply default model
-    if (this.piConfig.defaultModel && this.modelId !== this.piConfig.defaultModel) {
-      this.modelProvider = this.piConfig.defaultProvider || "deepseek";
-      this.modelId = this.piConfig.defaultModel;
+    if (serverConfig.defaultModel && this.modelId !== serverConfig.defaultModel) {
+      this.modelProvider = serverConfig.defaultProvider || "deepseek";
+      this.modelId = serverConfig.defaultModel;
     }
-    this.thinkingLevel = this.piConfig.defaultThinkingLevel || "off";
+    this.thinkingLevel = serverConfig.defaultThinkingLevel || "off";
     this.showConfig = false;
     this.requestUpdate();
+    // Request browser permission if enabled
+    if (this.piConfig.notifyBrowser) requestBrowserPermission();
   };
 
   toggleShortcuts = () => { this.showShortcuts = !this.showShortcuts; this.requestUpdate(); };
@@ -844,6 +970,19 @@ export class SessionChat extends LitElement {
                   </select>
                 </div>
               </div>
+              <div class="model-dialog-section-title">通知</div>
+              <div class="model-dialog-row">
+                <label class="model-dialog-checkbox">
+                  <input type="checkbox" .checked=${this.piConfig.notifySound} @change=${(e: Event) => { this.piConfig = { ...this.piConfig, notifySound: (e.target as HTMLInputElement).checked }; }}>
+                  <span>任务完成时播放提示音</span>
+                </label>
+              </div>
+              <div class="model-dialog-row">
+                <label class="model-dialog-checkbox">
+                  <input type="checkbox" .checked=${this.piConfig.notifyBrowser} @change=${(e: Event) => { this.piConfig = { ...this.piConfig, notifyBrowser: (e.target as HTMLInputElement).checked }; }}>
+                  <span>任务完成时浏览器桌面通知</span>
+                </label>
+              </div>
               <div class="model-dialog-section-title">对话</div>
               <div class="model-dialog-row">
                 <label class="model-dialog-checkbox">
@@ -916,7 +1055,17 @@ export class SessionChat extends LitElement {
               <span style="font-size:12px;font-weight:500;color:var(--text-weak);letter-spacing:0.04em">FILES</span>
               <file-upload></file-upload>
             </div>
-            <file-tree rootpath=${this.sessionCwd} style="flex:1;overflow-y:auto;min-height:0;padding:4px 0"></file-tree>
+            <file-tree rootpath=${this.sessionCwd} .gitStatus=${this.gitFiles} style="flex:1;overflow-y:auto;min-height:0;padding:4px 0"></file-tree>
+            <div class="sidebar-footer">
+              ${this.gitBranch ? html`
+                <div class="git-bar">
+                  <span class="git-branch-label">${this.gitBranch}</span>
+                  <span class="git-dirty-dot ${this.gitClean ? 'clean' : 'dirty'}"></span>
+                  <span class="git-action-btn" @click=${this.toggleGitDiff} title="Git Diff">Diff</span>
+                  <span class="git-action-btn" @click=${this.toggleCommitPanel} title="Commit & Push">Commit</span>
+                </div>
+              ` : html`<div class="git-bar"><span style="font-size:11px;color:var(--text-weaker)">not a git repo</span></div>`}
+            </div>
             <div class="ft-drop-overlay ${this.fileTreeDragging ? 'active' : ''}"></div>
             <div class="ft-drop-hint ${this.fileTreeDragging ? 'active' : ''}" style="left:${this.dropHintX || 0}px;top:${this.dropHintY || 0}px">${this.dropHintText || '拖放文件到此处上传'}</div>
           </div>
@@ -956,14 +1105,17 @@ export class SessionChat extends LitElement {
               </div>
             ` : ""}
             <div class="context-bar" @click=${() => { this.showContextDetail = !this.showContextDetail; this.requestUpdate(); }}>
-              <div class="context-bar-fill ${this.contextTokens / this.contextMax > 0.8 ? 'ctx-warn' : ''}" style="width:${Math.min(100, this.contextTokens / this.contextMax * 100)}%"></div>
-              <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.contextTokens.toLocaleString()} / ${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</span>
+              <div class="context-bar-fill ${this.getContextPercentage() > 0.8 ? 'ctx-warn' : ''}" style="width:${Math.min(100, this.getContextPercentage() * 100)}%"></div>
+              <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.getContextTokens().toLocaleString()} / ${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</span>
               ${this.showContextDetail ? html`
                 <div class="context-detail">
-                  <div class="ctx-detail-row"><span>已用 token</span><span>${this.contextTokens.toLocaleString()}</span></div>
-                  <div class="ctx-detail-row"><span>总量限制</span><span>${this.contextMax.toLocaleString()}</span></div>
-                  <div class="ctx-detail-row"><span>使用率</span><span>${(this.contextTokens / this.contextMax * 100).toFixed(1)}%</span></div>
+                  <div class="ctx-detail-row"><span>已用 token</span><span>${this.getContextTokens().toLocaleString()}</span></div>
+                  <div class="ctx-detail-row"><span>总量限制</span><span>${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</span></div>
+                  <div class="ctx-detail-row"><span>使用率</span><span>${(this.getContextPercentage() * 100).toFixed(1)}%</span></div>
+                  <div class="ctx-detail-row"><span>消息数</span><span>${this.agent?.state.messages.length || 0}</span></div>
                   <div class="ctx-detail-row"><span>模型</span><span>${this.modelLabel}</span></div>
+                  <div class="ctx-detail-row"><span>思考等级</span><span>${this.thinkingLevel}</span></div>
+                  <div class="ctx-detail-row"><span>流式状态</span><span>${this.agent?.state.isStreaming ? '进行中' : '空闲'}</span></div>
                   <div class="ctx-detail-row"><span>估算方式</span><span>字符数 ÷ 3</span></div>
                 </div>
               ` : ""}
@@ -991,6 +1143,48 @@ export class SessionChat extends LitElement {
 
 
       </div>
+        ${this.showGitDiff ? html`
+          <div class="git-panel">
+            <div class="terminal-header">
+              <span class="terminal-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Git Diff
+              </span>
+              <div class="git-panel-actions">
+                ${!this.gitClean ? html`<button class="terminal-action-btn" @click=${() => { fetch("/api/shell/exec", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ command: "git add -A", cwd: this.sessionCwd }) }).then(() => { this.fetchGitStatus(); this.fetchGitDiff(); }); }}>Stage All</button>` : ""}
+                <button class="close-btn" @click=${() => { this.showGitDiff = false; this.requestUpdate(); }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="git-panel-body">
+              ${this.diffLoading ? html`<div class="spinner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"></div>` : ""}
+              ${this.diffContent ? html`<pre class="diff-view">${unsafeHTML(renderDiff(this.diffContent))}</pre>` : html`<div class="diff-empty">No changes</div>`}
+            </div>
+          </div>
+        ` : ""}
+        ${this.showCommitPanel ? html`
+          <div class="git-panel">
+            <div class="terminal-header">
+              <span class="terminal-title">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg> Commit & Push
+              </span>
+              <button class="close-btn" @click=${() => { this.showCommitPanel = false; this.requestUpdate(); }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="git-panel-body" style="display:flex;flex-direction:column;gap:8px">
+              ${this.diffLoading ? html`<div class="spinner" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%)"></div>` : ""}
+              <div class="commit-diff-preview" style="max-height:160px;overflow-y:auto;flex-shrink:0">
+                ${this.diffContent ? html`<pre class="diff-view" style="max-height:160px">${unsafeHTML(renderDiff(this.diffContent, 4000))}</pre>` : html`<div class="diff-empty">No staged changes</div>`}
+              </div>
+              <textarea class="commit-input" placeholder="Commit message..." .value=${this.commitMsg} @input=${(e: InputEvent) => { this.commitMsg = (e.target as HTMLTextAreaElement).value; }} rows="3"></textarea>
+              <div style="display:flex;gap:8px;justify-content:flex-end">
+                <button class="terminal-action-btn" @click=${() => { this.showCommitPanel = false; this.requestUpdate(); }}>Cancel</button>
+                <button class="terminal-action-btn primary" ?disabled=${!this.commitMsg.trim()} @click=${this.doCommit}>Commit & Push</button>
+              </div>
+            </div>
+          </div>
+        ` : ""}
         ${this.showTerminal ? html`
           <div class="terminal-panel">
             <div class="terminal-header">
