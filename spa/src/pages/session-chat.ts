@@ -221,7 +221,7 @@ export class SessionChat extends LitElement {
         this._positionSlashDropdown();
       } else {
         const d = this.querySelector(".slash-dropdown") as HTMLElement | null;
-        if (d) { d.style.top = ""; d.style.bottom = ""; }
+        if (d) { d.style.position = ""; d.style.top = ""; d.style.bottom = ""; d.style.left = ""; d.style.transform = ""; }
       }
     }
     if ((changedProperties.has("showSlashCommands") || changedProperties.has("slashIdx")) && this.showSlashCommands) {
@@ -244,13 +244,13 @@ export class SessionChat extends LitElement {
     const dropdown = this.querySelector(".slash-dropdown") as HTMLElement | null;
     const ta = this._findTextarea();
     if (!dropdown || !ta) return;
-    const container = dropdown.offsetParent as HTMLElement | null;
-    if (!container) return;
     const taRect = ta.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
     const gap = 8;
-    dropdown.style.top = (taRect.top - containerRect.top - dropdown.offsetHeight - gap) + "px";
+    dropdown.style.position = "fixed";
+    dropdown.style.top = (taRect.top - dropdown.offsetHeight - gap) + "px";
+    dropdown.style.left = "50%";
     dropdown.style.bottom = "auto";
+    dropdown.style.transform = "translateX(-50%)";
   }
 
   private get _displayCommands() {

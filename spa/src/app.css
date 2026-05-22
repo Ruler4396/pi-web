@@ -623,7 +623,7 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
   display: none; position: absolute;
   left: 50%; transform: translateX(-50%);
   width: min(48rem, calc(100% - 16px));
-  max-height: 440px;
+  top: -9999px; max-height: 440px;
   overflow-y: auto; padding: 4px 0 8px;
   scrollbar-width: none; -ms-overflow-style: none;
   background: var(--surface-raised); border-radius: 8px;
