@@ -57,3 +57,37 @@ jobs:
         with:
           name: pi-web
           path: pi-web.tar.gz
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pi-web
+
+      - name: Install SSH key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          known_hosts: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          if_key_exists: replace
+
+      - name: Deploy to server
+        run: |
+          scp pi-web.tar.gz ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/pi-web.tar.gz
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} '
+            set -e
+            cd /tmp
+            tar xzf pi-web.tar.gz
+            cp pi-web/pi-web /opt/pi/pi-web
+            chmod +x /opt/pi/pi-web
+            rm -rf /opt/pi/spa-dist
+            cp -r pi-web/spa-dist /opt/pi/spa-dist
+            rm -rf pi-web pi-web.tar.gz
+            systemctl restart pi-web
+            sleep 2
+            systemctl status pi-web --no-pager | head -5
+          '
