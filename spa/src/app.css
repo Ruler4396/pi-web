@@ -623,26 +623,28 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
   display: none; position: absolute;
   left: 50%; transform: translateX(-50%);
   width: min(48rem, calc(100% - 16px));
-  bottom: 120px; max-height: 240px;
+  bottom: 160px; max-height: 400px;
   overflow-y: auto; padding: 4px 0;
+  scrollbar-width: none; -ms-overflow-style: none;
   background: var(--surface-raised); border-radius: 8px;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.1);
   z-index: 40;
 }
+.slash-dropdown::-webkit-scrollbar { display: none; }
 .slash-dropdown.active { display: block; }
 .slash-item {
   display: flex; align-items: center; gap: 10px;
-  padding: 6px 14px; font-size: 13px; cursor: pointer;
+  padding: 8px 14px; font-size: 14px; cursor: pointer;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--text-base); transition: background 0.1s;
 }
 .slash-item:hover { background: rgba(0,0,0,0.04); }
-.slash-label { font-weight: 600; min-width: 90px; }
-.slash-desc { font-size: 11px; color: var(--text-weaker); font-family: ui-sans-serif, system-ui, sans-serif; }
+.slash-label { font-weight: 600; min-width: 100px; }
+.slash-desc { font-size: 12px; color: var(--text-weaker); font-family: ui-sans-serif, system-ui, sans-serif; }
 [data-theme="dark"] .slash-dropdown { background: #1e1e1e; }
 [data-theme=dark] .slash-item:hover { background: rgba(255,255,255,0.04); }
 .slash-section {
-  padding: 6px 14px 2px; font-size: 10px; font-weight: 600;
+  padding: 8px 14px 4px; font-size: 10px; font-weight: 600;
   color: var(--text-weaker); text-transform: uppercase; letter-spacing: 0.05em;
   border-top: 1px solid var(--border-color); margin-top: 4px;
 }

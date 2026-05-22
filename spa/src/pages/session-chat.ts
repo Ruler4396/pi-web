@@ -100,6 +100,7 @@ export class SessionChat extends LitElement {
   @state() private tabs: FileTab[] = [];
   @state() private activeTab = 0;
   @state() tabPanelWidth = 42;
+  @state() private _slashFilterText = "";
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
   private msgInterval = 0;
@@ -163,7 +164,7 @@ export class SessionChat extends LitElement {
     const savedThink = localStorage.getItem("pi-current-thinking");
     if (savedThink) this.thinkingLevel = savedThink;
 
-    try { await this.initChat(); this.ready = true; console.log("[SLASH] initChat completed"); } catch (e: any) { console.error("[SLASH] initChat FAILED", e); this.error = e.message || "Failed"; }
+    try { await this.initChat(); this.ready = true; } catch (e: any) { this.error = e.message || "Failed"; }
     this.requestUpdate();
 
     this.addEventListener("file-select", ((e: CustomEvent) => {
@@ -184,7 +185,6 @@ export class SessionChat extends LitElement {
       this.requestUpdate();
     }) as EventListener);
     this._globalClick = (_e: Event) => {
-      if (this.showSlashCommands) console.log("[SLASH] global click closing menu");
       if (this.contextMenuVisible) { this.contextMenuVisible = false; this.requestUpdate(); }
       if (this.showSessionSwitcher) { this.showSessionSwitcher = false; this.requestUpdate(); }
       if (this.showSlashCommands) { this.showSlashCommands = false; this.requestUpdate(); }
@@ -215,23 +215,10 @@ export class SessionChat extends LitElement {
     document.removeEventListener("drop", this.onGlobalDrop);
   }
 
-  _checkSlashVisible() {
-    requestAnimationFrame(() => {
-      const sd = this.querySelector(".slash-dropdown");
-      if (!sd) { console.log("[SLASH] CHECK: element NOT FOUND in DOM"); return; }
-      const cs = getComputedStyle(sd);
-      const rect = sd.getBoundingClientRect();
-      console.log("[SLASH] CHECK: classes=", sd.className, "display=", cs.display, "position=", cs.position, "bounds=", JSON.stringify({top:Math.round(rect.top),bottom:Math.round(rect.bottom),left:Math.round(rect.left),right:Math.round(rect.right),width:Math.round(rect.width),height:Math.round(rect.height)}), "parent overflow=", sd.parentElement?.style?.overflow || getComputedStyle(sd.parentElement!).overflow, "parent pos=", getComputedStyle(sd.parentElement!).position);
-      // Walk up ancestors looking for overflow:hidden
-      let el = sd.parentElement;
-      while (el && el !== document.body) {
-        const oc = getComputedStyle(el).overflow;
-        if (oc === "hidden") { console.log("[SLASH] CLIP FOUND!", el.tagName, el.className); break; }
-        const oy = getComputedStyle(el).overflowY;
-        if (oy === "hidden") { console.log("[SLASH] CLIP FOUND (overflowY)!"); break; }
-        el = el.parentElement;
-      }
-    });
+  private get _displayCommands() {
+    const q = this._slashFilterText.slice(1).toLowerCase();
+    if (!q) return this.slashCommands;
+    return this.slashCommands.filter(c => c.cmd.slice(1).toLowerCase().startsWith(q));
   }
 
   async initChat() {
@@ -270,44 +257,49 @@ export class SessionChat extends LitElement {
     });
 
     // Hook slash command — document-level delegation survives Shadow DOM
-    console.log("[SLASH] initChat registering handlers", this.sessionId);
     this._slashInput = (e: Event) => {
       const ta = e.target as HTMLTextAreaElement;
-      console.log("[SLASH] input event", e.type, ta.tagName, JSON.stringify(ta.value), "showSlashCommands=", this.showSlashCommands);
       if (ta.tagName !== "TEXTAREA") return;
       const val = ta.value;
-      if (val === "/") { console.log("[SLASH] -> show true"); this.showSlashCommands = true; this.slashIdx = 0; this.requestUpdate(); this._checkSlashVisible(); }
-      else if (this.showSlashCommands && !val.startsWith("/")) { console.log("[SLASH] -> show false (no slash)"); this.showSlashCommands = false; this.requestUpdate(); }
-      else if (this.showSlashCommands && val.length > 1) {
-        const q = val.slice(1).toLowerCase();
-        this.slashIdx = this.slashCommands.findIndex(c => c.cmd.startsWith("/" + q));
-        if (this.slashIdx < 0) this.slashIdx = 0;
+      if (val === "/") {
+        this._slashFilterText = "";
+        this.showSlashCommands = true; this.slashIdx = 0;
+        this.requestUpdate();
+      } else if (val.startsWith("/") && val.length > 1) {
+        this._slashFilterText = val;
+        const filtered = this._displayCommands;
+        if (filtered.length === 0) { this.showSlashCommands = false; this.requestUpdate(); return; }
+        this.slashIdx = 0;
+        this.requestUpdate();
+      } else if (this.showSlashCommands) {
+        this.showSlashCommands = false; this._slashFilterText = "";
         this.requestUpdate();
       }
     };
     this._slashKeydown = (e: KeyboardEvent) => {
       const ta = e.target as HTMLTextAreaElement;
-      console.log("[SLASH] keydown event", e.key, ta.tagName, JSON.stringify(ta.value), "showSlashCommands=", this.showSlashCommands);
       if (ta.tagName !== "TEXTAREA") return;
       if (!this.showSlashCommands) {
         // Show menu on "/" keypress (fallback if input event missed)
         if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
           const val = ta.value;
           if (val.length === 0 || val === "/") {
-            console.log("[SLASH] keydown -> show true");
+            this._slashFilterText = "";
             this.showSlashCommands = true; this.slashIdx = 0; this.requestUpdate();
           }
         }
         return;
       }
-      if (e.key === "ArrowDown") { e.preventDefault(); this.slashIdx = (this.slashIdx + 1) % this.slashCommands.length; this.requestUpdate(); }
-      else if (e.key === "ArrowUp") { e.preventDefault(); this.slashIdx = (this.slashIdx - 1 + this.slashCommands.length) % this.slashCommands.length; this.requestUpdate(); }
+      const cmds = this._displayCommands;
+      if (cmds.length === 0) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); this.slashIdx = (this.slashIdx + 1) % cmds.length; this.requestUpdate(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); this.slashIdx = (this.slashIdx - 1 + cmds.length) % cmds.length; this.requestUpdate(); }
       else if (e.key === "Enter" && this.showSlashCommands) {
         e.preventDefault();
-        const cmd = this.slashCommands[this.slashIdx];
-        if (cmd) { ta.value = cmd.cmd + " "; this.showSlashCommands = false; this.requestUpdate(); }
+        const cmd = cmds[this.slashIdx];
+        if (cmd) { ta.value = cmd.cmd + " "; this.showSlashCommands = false; this._slashFilterText = ""; this.requestUpdate(); }
       }
-      else if (e.key === "Escape") { console.log("[SLASH] keydown Escape -> show false"); this.showSlashCommands = false; this.requestUpdate(); }
+      else if (e.key === "Escape") { this.showSlashCommands = false; this._slashFilterText = ""; this.requestUpdate(); }
     };
     document.addEventListener("input", this._slashInput);
     document.addEventListener("keydown", this._slashKeydown);
@@ -1454,21 +1446,35 @@ export class SessionChat extends LitElement {
               ` : ""}
             </div>
             <div class="slash-dropdown ${this.showSlashCommands ? 'active' : ''}">
-              ${this.slashCommands.map((c, i) => html`
-                ${i === 7 ? html`<div class="slash-section">AI 指令</div>` : ""}
-                <div class="slash-item${i === this.slashIdx ? ' selected' : ''}" @click=${() => {
-                  const cp = this.chatPanel;
-                  const editor = (cp as any)?.querySelector("message-editor") || this.querySelector("message-editor");
-                  const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea");
-                  if (ta) { (ta as HTMLTextAreaElement).value = c.cmd + " "; ta.focus(); }
-                  this.showSlashCommands = false;
-                  this.requestUpdate();
-                }}>
-                  <span class="slash-label">${c.cmd}</span>
-                  <span class="slash-desc">${c.desc}</span>
-                  ${c.action === "ai" ? html`<span class="slash-badge">AI</span>` : ""}
-                </div>
-              `)}
+              ${(() => {
+                const cmds = this._displayCommands;
+                const items: any[] = [];
+                let addedSection = false;
+                for (let i = 0; i < cmds.length; i++) {
+                  if (!this._slashFilterText && cmds[i].action === "ai" && !addedSection) {
+                    items.push({ _section: true });
+                    addedSection = true;
+                  }
+                  items.push({ _idx: i, cmd: cmds[i] });
+                }
+                return items.map(item => {
+                  if (item._section) return html`<div class="slash-section">AI 指令</div>`;
+                  const c = item.cmd;
+                  return html`
+                    <div class="slash-item${item._idx === this.slashIdx ? ' selected' : ''}" @click=${() => {
+                      const cp = this.chatPanel;
+                      const editor = (cp as any)?.querySelector("message-editor") || this.querySelector("message-editor");
+                      const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea");
+                      if (ta) { (ta as HTMLTextAreaElement).value = c.cmd + " "; ta.focus(); }
+                      this.showSlashCommands = false; this._slashFilterText = "";
+                      this.requestUpdate();
+                    }}>
+                      <span class="slash-label">${c.cmd}</span>
+                      <span class="slash-desc">${c.desc}</span>
+                      ${c.action === "ai" ? html`<span class="slash-badge">AI</span>` : ""}
+                    </div>`;
+                });
+              })()}
             </div>
             ${this.chatPanel}
           </div>
