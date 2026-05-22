@@ -186,6 +186,10 @@ export class SessionList extends LitElement {
   render() {
     return html`
       <div class="container" style="min-height:400px">
+        <div class="hero">
+          <h1>Pi Web</h1>
+          <p>AI coding assistant</p>
+        </div>
         <div class="actions">
           <button class="btn-new" @click=${this.openNewSessionDialog} ?disabled=${this.loading}>
             ${plusSvg} 新建会话
