@@ -248,9 +248,9 @@ export class SessionChat extends LitElement {
     const gap = 8;
     dropdown.style.position = "fixed";
     dropdown.style.top = (taRect.top - dropdown.offsetHeight - gap) + "px";
-    dropdown.style.left = "50%";
+    dropdown.style.left = (taRect.left + taRect.width / 2 - dropdown.offsetWidth / 2) + "px";
     dropdown.style.bottom = "auto";
-    dropdown.style.transform = "translateX(-50%)";
+    dropdown.style.transform = "none";
   }
 
   private get _displayCommands() {
