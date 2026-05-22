@@ -21,7 +21,7 @@ export class SessionList extends LitElement {
   @state() private loading = true;
   @state() private error = "";
   @state() private showDialog = false;
-  @state() private cwd = "/root";
+  @state() private cwd = "/root/dev";
   @state() private dirEntries: DirEntry[] = [];
   @state() private loadingDirs = false;
   @state() private renamingId = "";
@@ -30,7 +30,7 @@ export class SessionList extends LitElement {
 
   static styles = css`
     .dir-item .arrow { margin-left: auto; color: var(--text-weaker); flex-shrink: 0; display: flex; align-items: center; }
-    .dir-loading { padding: 16px; text-align: center; color: var(--text-weaker); font-size: 13px; }
+    .dir-loading { height: 280px; display: flex; align-items: center; justify-content: center; color: var(--text-weaker); font-size: 13px; }
     .btn-cancel { background: var(--bg-weak); color: var(--text-weak); }
     .btn-cancel:hover { background: rgba(0,0,0,0.08); }
     .rename-input {
@@ -217,8 +217,8 @@ export class SessionList extends LitElement {
           ? html`<div class="loading-wrap"><div class="spinner"></div></div>`
           : this.sessions.length === 0
               ? html`<div class="empty-state">
-                <h2>No sessions yet</h2>
-                <p>Create a session to start coding with AI.</p>
+                <h2>暂无会话</h2>
+                <p>创建会话开始与 AI 编程。</p>
               </div>`
             : html`<div class="session-list">
                 ${this.groupSessions().map(g => html`
@@ -235,7 +235,7 @@ export class SessionList extends LitElement {
                           : html`
                             <span class="session-name"><span class="s-dot ${s.active ? 'on' : 'off'}"></span>${s.name || this.shortId(s.id)}</span>
                           `}
-                        <span class="session-status ${s.active ? 'on' : 'off'}">${s.active ? "Active" : "Idle"}</span>
+                        <span class="session-status ${s.active ? 'on' : 'off'}">${s.active ? "活跃" : "空闲"}</span>
                         <span class="session-actions">
                           <button class="actn" @click=${(e: Event) => this.startRename(s, e)} title="Rename">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -261,9 +261,9 @@ export class SessionList extends LitElement {
               </div>
               <div class="dir-list">
                 ${this.loadingDirs
-                  ? html`<div class="dir-loading" style="min-height:40px;display:flex;align-items:center;justify-content:center">加载中...</div>`
+                  ? html`<div class="dir-loading">加载中...</div>`
                   : this.dirEntries.length === 0
-                    ? html`<div class="dir-loading">No subdirectories</div>`
+                    ? html`<div class="dir-loading">无子目录</div>`
                     : this.dirEntries.map((d: DirEntry) => html`
                         <div class="dir-item" @click=${() => this.navigateTo(d.name)}>
                           ${folderSvg}
@@ -273,8 +273,8 @@ export class SessionList extends LitElement {
                       `)}
               </div>
               <div class="dialog-buttons">
-                <button class="btn-cancel" @click=${this.cancelDialog}>Cancel</button>
-                <button class="btn-confirm" @click=${this.confirmCreateSession}>Create in ${this.cwd}</button>
+                <button class="btn-cancel" @click=${this.cancelDialog}>取消</button>
+                <button class="btn-confirm" @click=${this.confirmCreateSession}>创建到 ${this.cwd}</button>
               </div>
             </div>
           </div>`
