@@ -7,7 +7,6 @@ interface DirEntry {
   type: "file" | "directory";
 }
 
-const chatSvg = html`<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
 const plusSvg = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
 const folderSvg = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
 const folderOpenSvg = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2.5L10 7h10a2 2 0 0 1 2 2v1"/></svg>`;
@@ -27,14 +26,9 @@ export class SessionList extends LitElement {
   @state() private loadingDirs = false;
   @state() private renamingId = "";
   @state() private renameValue = "";
+  @state() private expandedDirs: Record<string, boolean> = {};
 
   static styles = css`
-    .icon-active { background: #eff6ff; color: #2563eb; }
-    .icon-idle { background: var(--bg-weak, #f3f3f3); color: var(--text-weaker, #b0b0b0); }
-    .status-active { background: #dcfce7; color: #15803d; }
-    .status-idle { background: var(--bg-weak, #f3f3f3); color: var(--text-weak, #8f8f8f); }
-    .btn-icon.archive:hover { background: #eff6ff; color: #2563eb; }
-    .btn-icon.delete:hover { background: #fef2f2; color: #dc2626; }
     .dir-item .arrow { margin-left: auto; color: var(--text-weaker); flex-shrink: 0; display: flex; align-items: center; }
     .dir-loading { padding: 16px; text-align: center; color: var(--text-weaker); font-size: 13px; }
     .btn-cancel { background: var(--bg-weak); color: var(--text-weak); }
@@ -45,8 +39,6 @@ export class SessionList extends LitElement {
       font-family: ui-sans-serif, system-ui, sans-serif;
       outline: none; box-shadow: 0 0 0 1px var(--border-color);
     }
-    .btn-icon.rename { color: var(--text-weaker); }
-    .btn-icon.rename:hover { background: #eff6ff; color: #2563eb; }
   `;
 
   onSelect?: (id: string) => void;
@@ -183,6 +175,31 @@ export class SessionList extends LitElement {
     this.requestUpdate();
   }
 
+  private groupSessions() {
+    const groups: { dir: string; sessions: any[] }[] = [];
+    const map = new Map<string, any[]>();
+    for (const s of this.sessions) {
+      const dir = s.cwd || "其他";
+      if (!map.has(dir)) map.set(dir, []);
+      map.get(dir)!.push(s);
+    }
+    for (const [dir, sessions] of map) {
+      sessions.sort((a, b) => a.active === b.active ? 0 : a.active ? -1 : 1);
+      groups.push({ dir, sessions });
+    }
+    groups.sort((a, b) => a.dir.localeCompare(b.dir));
+    return groups;
+  }
+
+  private toggleDir(dir: string) {
+    this.expandedDirs = { ...this.expandedDirs, [dir]: !(this.expandedDirs[dir] ?? true) };
+    this.requestUpdate();
+  }
+
+  private isDirExpanded(dir: string) {
+    return this.expandedDirs[dir] ?? true;
+  }
+
   render() {
     return html`
       <div class="container" style="min-height:400px">
@@ -199,41 +216,37 @@ export class SessionList extends LitElement {
         ${this.loading
           ? html`<div class="loading-wrap"><div class="spinner"></div></div>`
           : this.sessions.length === 0
-            ? html`<div class="empty-state">
-                <div class="empty-icon">${chatSvg}</div>
+              ? html`<div class="empty-state">
                 <h2>No sessions yet</h2>
                 <p>Create a session to start coding with AI.</p>
               </div>`
             : html`<div class="session-list">
-                ${this.sessions.map(
-                  (s: any) => html`
-                    <div class="session-card" @click=${() => this.onSelect?.(s.id)}>
-                      <div class="session-icon ${s.active ? 'icon-active' : 'icon-idle'}">
-                        ${(s.name || s.cwd || s.id || "?").slice(0, 2).toUpperCase()}
-                      </div>
-                      <div class="session-body">
+                ${this.groupSessions().map(g => html`
+                  <div class="dir-group">
+                    <div class="dir-header" @click=${() => this.toggleDir(g.dir)}>
+                      <span class="dir-label">${g.dir}</span>
+                      <span class="dir-count">${g.sessions.length}</span>
+                      <span class="dir-chevron">${this.isDirExpanded(g.dir) ? '\u2212' : '+'}</span>
+                    </div>
+                    ${this.isDirExpanded(g.dir) ? g.sessions.map(s => html`
+                      <div class="session-row" @click=${() => this.onSelect?.(s.id)}>
                         ${this.renamingId === s.id
                           ? html`<input class="rename-input" .value=${this.renameValue} @input=${(e: InputEvent) => { this.renameValue = (e.target as HTMLInputElement).value; }} @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter") this.saveRename(s.id); if (e.key === "Escape") this.cancelRename(); }} @click=${(e: Event) => e.stopPropagation()}>`
                           : html`
-                            <div class="session-title">${s.name || s.cwd || this.shortId(s.id)}</div>
-                            <div class="session-sub">${s.id?.slice(0, 8) || "..."}</div>
+                            <span class="session-name"><span class="s-dot ${s.active ? 'on' : 'off'}"></span>${s.name || this.shortId(s.id)}</span>
                           `}
+                        <span class="session-status ${s.active ? 'on' : 'off'}">${s.active ? "Active" : "Idle"}</span>
+                        <span class="session-actions">
+                          <button class="actn" @click=${(e: Event) => this.startRename(s, e)} title="Rename">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                          </button>
+                          <button class="actn" @click=${(e: Event) => this.archiveSession(s.id, e)} title="Archive">${archiveSvg}</button>
+                          <button class="actn actn-del" @click=${(e: Event) => this.deleteSession(s.id, e)} title="Delete">${trashSvg}</button>
+                        </span>
                       </div>
-                      <span class="session-status ${s.active ? 'status-active' : 'status-idle'}">
-                        ${s.active ? "Active" : "Idle"}
-                      </span>
-                      <button class="btn-icon rename" @click=${(e: Event) => this.startRename(s, e)} title="Rename session">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      </button>
-                      <button class="btn-icon archive" @click=${(e: Event) => this.archiveSession(s.id, e)} title="Archive session">
-                        ${archiveSvg}
-                      </button>
-                      <button class="btn-icon delete" @click=${(e: Event) => this.deleteSession(s.id, e)} title="Delete session">
-                        ${trashSvg}
-                      </button>
-                    </div>
-                  `
-                )}
+                    `) : ""}
+                  </div>
+                `)}
               </div>`}
       </div>
 
