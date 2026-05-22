@@ -620,7 +620,7 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 
 /* Slash command dropdown */
 .slash-dropdown {
-  display: none; margin: 0 8px;
+  display: none; position: absolute; bottom: 64px; left: 8px; right: 8px;
   background: var(--surface-raised); border-radius: 8px;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.1);
   z-index: 40; max-height: 240px; overflow-y: auto; padding: 4px 0;
