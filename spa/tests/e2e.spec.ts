@@ -129,3 +129,33 @@ test('opening terminal closes model dropdown', async ({ page }) => {
     await deleteSession(page, id);
   }
 });
+
+test('filtered slash command menu stays anchored to composer', async ({ page }) => {
+  const { id } = await createFixtureSession(page);
+  try {
+    await page.goto(`/#/session/${id}`);
+    await page.waitForSelector('message-editor');
+    const gap = await page.evaluate(async () => {
+      const editor = document.querySelector('message-editor') as any;
+      const textarea = editor?.shadowRoot?.querySelector('textarea') || editor?.querySelector('textarea');
+      if (!textarea) throw new Error('textarea not found');
+      textarea.focus();
+      textarea.value = '/';
+      textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '/' }));
+      await new Promise(requestAnimationFrame);
+      textarea.value = '/mo';
+      textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'o' }));
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+      const dropdown = document.querySelector('.slash-dropdown') as HTMLElement | null;
+      if (!dropdown) throw new Error('slash dropdown not found');
+      const dropdownRect = dropdown.getBoundingClientRect();
+      const textareaRect = textarea.getBoundingClientRect();
+      return Math.round(textareaRect.top - dropdownRect.bottom);
+    });
+    expect(gap).toBeGreaterThanOrEqual(6);
+    expect(gap).toBeLessThanOrEqual(10);
+  } finally {
+    await deleteSession(page, id);
+  }
+});

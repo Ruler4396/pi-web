@@ -241,16 +241,28 @@ export class SessionChat extends LitElement {
   }
 
   updated(changedProperties: Map<string, unknown>) {
+    const slashLayoutChanged =
+      changedProperties.has("showSlashCommands") ||
+      changedProperties.has("_slashFilterText") ||
+      changedProperties.has("slashIdx");
+
     if (changedProperties.has("showSlashCommands")) {
-      if (this.showSlashCommands) {
-        this._positionSlashDropdown();
-      } else {
+      if (!this.showSlashCommands) {
         const d = this.querySelector(".slash-dropdown") as HTMLElement | null;
-        if (d) { d.style.position = ""; d.style.top = ""; d.style.bottom = ""; d.style.left = ""; d.style.transform = ""; }
+        if (d) {
+          d.style.position = "";
+          d.style.top = "";
+          d.style.bottom = "";
+          d.style.left = "";
+          d.style.width = "";
+          d.style.maxHeight = "";
+          d.style.transform = "";
+        }
       }
     }
-    if ((changedProperties.has("showSlashCommands") || changedProperties.has("slashIdx")) && this.showSlashCommands) {
+    if (slashLayoutChanged && this.showSlashCommands) {
       requestAnimationFrame(() => {
+        this._positionSlashDropdown();
         const sel = this.querySelector(".slash-item.selected");
         const parent = sel?.parentElement;
         if (sel && parent) {
@@ -279,9 +291,24 @@ export class SessionChat extends LitElement {
     if (!dropdown || !ta) return;
     const taRect = ta.getBoundingClientRect();
     const gap = 8;
+    const viewportPadding = 12;
+    const width = Math.min(taRect.width, 720);
+    const availableHeight = Math.max(80, taRect.top - viewportPadding - gap);
+    const maxHeight = Math.min(440, availableHeight);
+
     dropdown.style.position = "fixed";
-    dropdown.style.top = (taRect.top - dropdown.offsetHeight - gap) + "px";
-    dropdown.style.left = (taRect.left + taRect.width / 2 - dropdown.offsetWidth / 2) + "px";
+    dropdown.style.width = `${width}px`;
+    dropdown.style.maxHeight = `${maxHeight}px`;
+
+    const measuredHeight = Math.min(dropdown.offsetHeight, maxHeight);
+    const left = Math.max(
+      viewportPadding,
+      Math.min(window.innerWidth - width - viewportPadding, taRect.left + taRect.width / 2 - width / 2),
+    );
+    const top = Math.max(viewportPadding, taRect.top - measuredHeight - gap);
+
+    dropdown.style.top = `${top}px`;
+    dropdown.style.left = `${left}px`;
     dropdown.style.bottom = "auto";
     dropdown.style.transform = "none";
   }
