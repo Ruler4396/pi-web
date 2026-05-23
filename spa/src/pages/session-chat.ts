@@ -105,6 +105,15 @@ export class SessionChat extends LitElement {
   @state() commitMsg = "";
   @state() diffContent = "";
   @state() diffLoading = false;
+  @state() goalStatus: {
+    running: boolean;
+    goal?: string;
+    iteration?: number;
+    maxIterations?: number;
+    completed?: boolean;
+    summary?: string;
+    description?: string;
+  } | null = null;
   _gitInterval: any = null;
   @state() runningTools: string[] = [];
   @state() showNewFileDialog = false;
@@ -339,6 +348,37 @@ export class SessionChat extends LitElement {
   async initChat() {
     this.agent = new HttpAgent(this.sessionId);
     this.agent.subscribe((event: any) => {
+      if (event.type === "goal_start") {
+        this.goalStatus = {
+          running: true,
+          goal: event.goal || "",
+          iteration: 0,
+          maxIterations: event.maxIterations || 0,
+          description: "Starting",
+        };
+        this.showToast("info", "Goal started");
+        this.requestUpdate();
+      }
+      if (event.type === "goal_iteration") {
+        this.goalStatus = {
+          ...(this.goalStatus || { running: true }),
+          running: true,
+          iteration: event.iteration || 0,
+          description: event.description || "",
+        };
+        this.requestUpdate();
+      }
+      if (event.type === "goal_end") {
+        this.goalStatus = {
+          ...(this.goalStatus || { running: false }),
+          running: false,
+          completed: !!event.completed,
+          iteration: event.totalIterations || this.goalStatus?.iteration || 0,
+          summary: event.summary || "",
+        };
+        this.showToast(event.completed ? "info" : "hermes", event.completed ? "Goal completed" : "Goal stopped");
+        this.requestUpdate();
+      }
       if (event.type === "agent_end" && event.messages?.length) {
         const lastMsg = event.messages[event.messages.length - 1];
         const text = lastMsg?.content?.map?.((c: any) => c.text || "").join("")?.slice(0, 100) || "";
@@ -1270,6 +1310,14 @@ export class SessionChat extends LitElement {
             ` : ""}
           </div>
           <span class="divider">&#183;</span><span class="sid" style="font-family:ui-sans-serif,system-ui,sans-serif;font-size:11px">${this.sessionCwd}</span>
+          ${this.goalStatus ? html`
+            <div class="goal-indicator ${this.goalStatus.running ? 'running' : this.goalStatus.completed ? 'done' : 'stopped'}" title=${this.goalStatus.summary || this.goalStatus.description || this.goalStatus.goal || "Goal"}>
+              ${this.goalStatus.running ? html`<span class="tool-spinner"></span>` : html`<span class="goal-dot"></span>`}
+              <span class="goal-label">${this.goalStatus.running
+                ? `Goal ${((this.goalStatus.iteration || 0) + 1).toString()}${this.goalStatus.maxIterations ? `/${this.goalStatus.maxIterations}` : ""}`
+                : this.goalStatus.completed ? "Goal done" : "Goal stopped"}</span>
+            </div>
+          ` : ""}
           ${this.runningTools.length > 0 ? html`
             <div class="tool-indicator">
               <span class="tool-spinner"></span>

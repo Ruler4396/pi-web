@@ -173,6 +173,50 @@ export class HttpAgent {
                 await this.emit({ type: "message_end", message: endMsg || { role: "assistant", content: [{ type: "text", text: currentAssistantContent }] } });
                 break;
               }
+              case "goal_start":
+                this._state.goalStatus = {
+                  running: true,
+                  goal: raw.goal || "",
+                  maxIterations: raw.maxIterations || raw.max_iterations || 0,
+                  iteration: 0,
+                  description: "Starting",
+                };
+                await this.emit({
+                  type: "goal_start",
+                  goal: this._state.goalStatus.goal,
+                  maxIterations: this._state.goalStatus.maxIterations,
+                } as any);
+                break;
+              case "goal_iteration":
+                this._state.goalStatus = {
+                  ...(this._state.goalStatus || { running: true }),
+                  running: true,
+                  iteration: raw.iteration || 0,
+                  isPlanning: raw.isPlanning || raw.is_planning || false,
+                  description: raw.description || "",
+                };
+                await this.emit({
+                  type: "goal_iteration",
+                  iteration: this._state.goalStatus.iteration,
+                  isPlanning: this._state.goalStatus.isPlanning,
+                  description: this._state.goalStatus.description,
+                } as any);
+                break;
+              case "goal_end":
+                this._state.goalStatus = {
+                  ...(this._state.goalStatus || {}),
+                  running: false,
+                  completed: !!raw.completed,
+                  totalIterations: raw.totalIterations || raw.total_iterations || 0,
+                  summary: raw.summary || "",
+                };
+                await this.emit({
+                  type: "goal_end",
+                  completed: this._state.goalStatus.completed,
+                  totalIterations: this._state.goalStatus.totalIterations,
+                  summary: this._state.goalStatus.summary,
+                } as any);
+                break;
               case "tool_execution_start":
                 this._state.pendingToolCalls.add(raw.toolCallId || raw.tool_call_id || "");
                 await this.emit({
@@ -349,6 +393,17 @@ class HttpAgentState implements AgentState {
   pendingToolCalls: Set<string> = new Set();
   streamingMessage?: any;
   errorMessage?: string;
+  goalStatus?: {
+    running: boolean;
+    goal?: string;
+    maxIterations?: number;
+    iteration?: number;
+    isPlanning?: boolean;
+    description?: string;
+    completed?: boolean;
+    totalIterations?: number;
+    summary?: string;
+  };
   model: Model<any> = { provider: "deepseek", id: "deepseek-chat", label: "DeepSeek Chat" } as any;
 
   get tools(): AgentTool<any>[] {

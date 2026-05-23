@@ -194,6 +194,26 @@ pub enum AgentEvent {
     },
     #[serde(rename = "message_end")]
     MessageEnd { message: Value },
+    #[serde(rename = "goal_start")]
+    GoalStart {
+        goal: String,
+        #[serde(rename = "maxIterations")]
+        max_iterations: usize,
+    },
+    #[serde(rename = "goal_iteration")]
+    GoalIteration {
+        iteration: usize,
+        #[serde(rename = "isPlanning")]
+        is_planning: bool,
+        description: String,
+    },
+    #[serde(rename = "goal_end")]
+    GoalEnd {
+        completed: bool,
+        #[serde(rename = "totalIterations")]
+        total_iterations: usize,
+        summary: Option<String>,
+    },
     #[serde(rename = "tool_execution_start")]
     ToolExecutionStart {
         #[serde(rename = "toolCallId")]
@@ -283,4 +303,59 @@ pub enum AgentEvent {
     },
     #[serde(other)]
     Unknown,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn parses_goal_lifecycle_events_from_pi_rust() {
+        let start = serde_json::from_value::<AgentEvent>(json!({
+            "type": "goal_start",
+            "goal": "ship stage A",
+            "maxIterations": 30
+        }))
+        .expect("parse goal_start");
+        assert!(matches!(
+            start,
+            AgentEvent::GoalStart {
+                goal,
+                max_iterations: 30
+            } if goal == "ship stage A"
+        ));
+
+        let iteration = serde_json::from_value::<AgentEvent>(json!({
+            "type": "goal_iteration",
+            "iteration": 2,
+            "isPlanning": false,
+            "description": "Autonomous iteration 3"
+        }))
+        .expect("parse goal_iteration");
+        assert!(matches!(
+            iteration,
+            AgentEvent::GoalIteration {
+                iteration: 2,
+                is_planning: false,
+                description,
+            } if description == "Autonomous iteration 3"
+        ));
+
+        let end = serde_json::from_value::<AgentEvent>(json!({
+            "type": "goal_end",
+            "completed": false,
+            "totalIterations": 3,
+            "summary": "Stopped after repeated no-progress goal responses"
+        }))
+        .expect("parse goal_end");
+        assert!(matches!(
+            end,
+            AgentEvent::GoalEnd {
+                completed: false,
+                total_iterations: 3,
+                summary: Some(summary),
+            } if summary.contains("no-progress")
+        ));
+    }
 }

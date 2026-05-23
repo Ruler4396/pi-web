@@ -881,6 +881,28 @@ message-list .message-body, streaming-message-container .message-body {
   font-size: 11px; color: #2563eb;
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
+.goal-indicator {
+  display: flex; align-items: center; gap: 5px;
+  max-width: 170px; padding: 1px 8px; border-radius: 10px;
+  background: rgba(37,99,235,0.08);
+  font-size: 11px; color: #2563eb;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+.goal-indicator.stopped {
+  background: rgba(245,158,11,0.1);
+  color: #b45309;
+}
+.goal-indicator.done {
+  background: rgba(22,163,74,0.1);
+  color: #15803d;
+}
+.goal-label {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.goal-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.78;
+  flex: 0 0 auto;
+}
 .tool-spinner {
   width: 10px; height: 10px; border: 2px solid rgba(37,99,235,0.2);
   border-top-color: #2563eb; border-radius: 50%;
