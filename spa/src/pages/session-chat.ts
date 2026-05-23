@@ -8,22 +8,44 @@ import { renderDiff } from "../diff";
 import { setupToolRenderers } from "../tool-renderers";
 
 const THEME_KEY = "pi-theme";
+const FOCUS_CWD = "/root/dev/pi-web";
 
-function highlightCode(code: string, filename: string): string {
-  let escaped = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const kw = "fn|let|mut|const|var|function|class|return|if|else|for|while|match|impl|pub|use|mod|struct|enum|trait|async|await|import|export|from|def|self|yield|raise|try|catch|throw|new|static|void|int|string|bool|type|interface|extends|implements|package|private|protected|public|final|where|loop|break|continue|move|ref|dyn|unsafe|as|crate|super|in";
-  escaped = escaped.replace(new RegExp(`\\b(${kw})\\b`, "g"), '<span class="hl-kw">$1</span>');
-  escaped = escaped.replace(/\b([A-Z][a-zA-Z0-9]*)\b/g, '<span class="hl-type">$1</span>');
-  escaped = escaped.replace(/"([^"\\]|\\.)*"/g, '<span class="hl-str">$&</span>');
-  escaped = escaped.replace(/'([^'\\]|\\.)*'/g, '<span class="hl-str">$&</span>');
-  escaped = escaped.replace(/`([^`\\]|\\.)*`/g, '<span class="hl-str">$&</span>');
-  escaped = escaped.replace(/(\/\/.*$)/gm, '<span class="hl-cmt">$1</span>');
-  escaped = escaped.replace(/(#.*$)/gm, '<span class="hl-cmt">$1</span>');
-  escaped = escaped.replace(/\b(\d+\.?\d*)\b/g, '<span class="hl-num">$1</span>');
-  return escaped;
+function escapeHtml(code: string): string {
+  return code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-interface FileTab { path: string; name: string; content: string; }
+function highlightPlainText(text: string): string {
+  const kw = "fn|let|mut|const|var|function|class|return|if|else|for|while|match|impl|pub|use|mod|struct|enum|trait|async|await|import|export|from|def|self|yield|raise|try|catch|throw|new|static|void|int|string|bool|type|interface|extends|implements|package|private|protected|public|final|where|loop|break|continue|move|ref|dyn|unsafe|as|crate|super|in";
+  return escapeHtml(text)
+    .replace(new RegExp(`\\b(${kw})\\b`, "g"), '<span class="hl-kw">$1</span>')
+    .replace(/\b([A-Z][a-zA-Z0-9]*)\b/g, '<span class="hl-type">$1</span>')
+    .replace(/\b(\d+\.?\d*)\b/g, '<span class="hl-num">$1</span>');
+}
+
+function highlightCodeLine(line: string): string {
+  const commentStarts = [line.indexOf("//"), line.indexOf("#")].filter(i => i >= 0);
+  const commentAt = commentStarts.length ? Math.min(...commentStarts) : -1;
+  const codePart = commentAt >= 0 ? line.slice(0, commentAt) : line;
+  const commentPart = commentAt >= 0 ? line.slice(commentAt) : "";
+  const stringPattern = /("([^"\\]|\\.)*"|'([^'\\]|\\.)*'|`([^`\\]|\\.)*`)/g;
+  let out = "";
+  let last = 0;
+  for (const match of codePart.matchAll(stringPattern)) {
+    const idx = match.index ?? 0;
+    out += highlightPlainText(codePart.slice(last, idx));
+    out += '<span class="hl-str">' + escapeHtml(match[0]) + '</span>';
+    last = idx + match[0].length;
+  }
+  out += highlightPlainText(codePart.slice(last));
+  if (commentPart) out += '<span class="hl-cmt">' + escapeHtml(commentPart) + '</span>';
+  return out;
+}
+
+function highlightCode(code: string, _filename: string): string {
+  return code.split("\n").map(highlightCodeLine).join("\n");
+}
+
+interface FileTab { path: string; name: string; content: string | null; error?: string; }
 
 @customElement("session-chat")
 export class SessionChat extends LitElement {
@@ -186,7 +208,10 @@ export class SessionChat extends LitElement {
     }) as EventListener);
     this._globalClick = (_e: Event) => {
       if (this.contextMenuVisible) { this.contextMenuVisible = false; this.requestUpdate(); }
-      if (this.showSessionSwitcher) { this.showSessionSwitcher = false; this.requestUpdate(); }
+      if (this.showSessionSwitcher || this.showModelDropdown || this.showThinkingDropdown || this.showContextDetail) {
+        this.closeFloatingPanels();
+        this.requestUpdate();
+      }
       if (this.showSlashCommands) { this.showSlashCommands = false; this.requestUpdate(); }
     };
     document.addEventListener("click", this._globalClick);
@@ -227,7 +252,15 @@ export class SessionChat extends LitElement {
     if ((changedProperties.has("showSlashCommands") || changedProperties.has("slashIdx")) && this.showSlashCommands) {
       requestAnimationFrame(() => {
         const sel = this.querySelector(".slash-item.selected");
-        sel?.scrollIntoView({ block: "nearest" });
+        const parent = sel?.parentElement;
+        if (sel && parent) {
+          const selectedTop = (sel as HTMLElement).offsetTop;
+          const selectedBottom = selectedTop + (sel as HTMLElement).offsetHeight;
+          if (selectedTop < parent.scrollTop) parent.scrollTop = selectedTop;
+          if (selectedBottom > parent.scrollTop + parent.clientHeight) {
+            parent.scrollTop = selectedBottom - parent.clientHeight;
+          }
+        }
       });
     }
   }
@@ -375,10 +408,33 @@ export class SessionChat extends LitElement {
     }, 500);
     setupToolRenderers(this.sessionCwd);
     this._setupMessageObserver();
+    requestAnimationFrame(() => this.updateComposerHint());
     this.requestUpdate();
   }
 
-  toggleModelDropdown = () => { this.showModelDropdown = !this.showModelDropdown; this.requestUpdate(); };
+  private updateComposerHint() {
+    const ta = this._findTextarea();
+    if (!ta) return;
+    ta.placeholder = "Ask rustpi anything...  / for commands, @ for files";
+  }
+
+  private closeFloatingPanels(except: string = "") {
+    if (except !== "model") this.showModelDropdown = false;
+    if (except !== "thinking") this.showThinkingDropdown = false;
+    if (except !== "sessions") this.showSessionSwitcher = false;
+    if (except !== "shortcuts") this.showShortcuts = false;
+    if (except !== "settings") this.showSettings = false;
+    if (except !== "config") this.showConfig = false;
+    if (except !== "addModel") this.showAddModelDialog = false;
+    if (except !== "context") this.showContextDetail = false;
+  }
+
+  toggleModelDropdown = () => {
+    const next = !this.showModelDropdown;
+    this.closeFloatingPanels("model");
+    this.showModelDropdown = next;
+    this.requestUpdate();
+  };
   selectModel = (provider: string, id: string, label: string, thinking: boolean, builtin: boolean) => {
     this.modelProvider = provider; this.modelId = id; this.modelLabel = label;
     this.showModelDropdown = false;
@@ -415,7 +471,12 @@ export class SessionChat extends LitElement {
       .catch(() => {});
   };
   @state() showThinkingDropdown = false;
-  toggleThinkingMenu = () => { this.showThinkingDropdown = !this.showThinkingDropdown; this.requestUpdate(); };
+  toggleThinkingMenu = () => {
+    const next = !this.showThinkingDropdown;
+    this.closeFloatingPanels("thinking");
+    this.showThinkingDropdown = next;
+    this.requestUpdate();
+  };
   setThinkingLevel = (level: string) => {
     this.thinkingLevel = level;
     this.showThinkingDropdown = false;
@@ -711,7 +772,7 @@ export class SessionChat extends LitElement {
     if (c === "/help") { this.showShortcuts = true; this.requestUpdate(); return; }
     if (c === "/keys" || c === "/settings") { this.toggleSettings(); return; }
     if (c === "/config") { this.toggleConfig(); return; }
-    if (c === "/models") { this.showModelDropdown = true; this.requestUpdate(); return; }
+    if (c === "/models") { this.closeFloatingPanels("model"); this.showModelDropdown = true; this.requestUpdate(); return; }
     if (c === "/theme dark") { this.theme = "dark"; document.documentElement.dataset.theme = "dark"; localStorage.setItem("pi-theme", "dark"); this.requestUpdate(); return; }
     if (c === "/theme light") { this.theme = ""; document.documentElement.dataset.theme = "light"; localStorage.setItem("pi-theme", "light"); this.requestUpdate(); return; }
     if (c === "/clear") {
@@ -733,7 +794,9 @@ export class SessionChat extends LitElement {
   }
 
   toggleConfig = async () => {
-    this.showConfig = !this.showConfig;
+    const next = !this.showConfig;
+    this.closeFloatingPanels("config");
+    this.showConfig = next;
     if (this.showConfig) {
       try { const r = await fetch("/api/config"); this.piConfig = await r.json(); } catch {}
       const ns = getNotifySettings();
@@ -762,10 +825,17 @@ export class SessionChat extends LitElement {
     if (this.piConfig.notifyBrowser) requestBrowserPermission();
   };
 
-  toggleShortcuts = () => { this.showShortcuts = !this.showShortcuts; this.requestUpdate(); };
+  toggleShortcuts = () => {
+    const next = !this.showShortcuts;
+    this.closeFloatingPanels("shortcuts");
+    this.showShortcuts = next;
+    this.requestUpdate();
+  };
 
   toggleSettings = async () => {
-    this.showSettings = !this.showSettings;
+    const next = !this.showSettings;
+    this.closeFloatingPanels("settings");
+    this.showSettings = next;
     if (this.showSettings) {
       try {
         const res = await fetch("/api/keys");
@@ -785,7 +855,7 @@ export class SessionChat extends LitElement {
   };
 
   openAddModel = () => {
-    this.showModelDropdown = false;
+    this.closeFloatingPanels("addModel");
     this.showAddModelDialog = true;
     this.addModelForm = { provider: "", id: "", label: "", apiKey: "", baseUrl: "", thinking: false };
     this.requestUpdate();
@@ -855,7 +925,12 @@ export class SessionChat extends LitElement {
     return parts;
   }
 
-  toggleTerminal = () => { this.showTerminal = !this.showTerminal; this.requestUpdate(); };
+  toggleTerminal = () => {
+    const next = !this.showTerminal;
+    this.closeFloatingPanels();
+    this.showTerminal = next;
+    this.requestUpdate();
+  };
 
   private toggleTheme = () => {
     const next = this.theme === "dark" ? "" : "dark";
@@ -873,7 +948,7 @@ export class SessionChat extends LitElement {
       } else { this.activeTab = existing; }
       this.requestUpdate(); return;
     }
-    const newTab: FileTab = { path: relPath, name, content: "" };
+    const newTab: FileTab = { path: relPath, name, content: null };
     this.tabs = [...this.tabs, newTab];
     this.activeTab = this.tabs.length - 1;
     this.requestUpdate();
@@ -883,9 +958,15 @@ export class SessionChat extends LitElement {
       if (res.ok) {
         const data = await res.json();
         const idx = this.tabs.findIndex(t => t.path === relPath);
-        if (idx >= 0) { this.tabs[idx].content = data.content || ""; this.requestUpdate(); }
+        if (idx >= 0) { this.tabs[idx] = { ...this.tabs[idx], content: data.content || "" }; this.requestUpdate(); }
+      } else {
+        const idx = this.tabs.findIndex(t => t.path === relPath);
+        if (idx >= 0) { this.tabs[idx] = { ...this.tabs[idx], content: "", error: `HTTP ${res.status}` }; this.requestUpdate(); }
       }
-    } catch {}
+    } catch (e: any) {
+      const idx = this.tabs.findIndex(t => t.path === relPath);
+      if (idx >= 0) { this.tabs[idx] = { ...this.tabs[idx], content: "", error: e.message || "读取失败" }; this.requestUpdate(); }
+    }
   }
 
   closeTab = (index: number, e: Event) => {
@@ -1130,7 +1211,7 @@ export class SessionChat extends LitElement {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
           </a>
           <div class="ss-wrap" style="position:relative">
-            <button class="ss-btn" @click=${(e: Event) => { e.stopPropagation(); this.loadAllSessions(); this.showSessionSwitcher = !this.showSessionSwitcher; this.requestUpdate(); }}>
+            <button class="ss-btn" aria-label="切换会话" @click=${(e: Event) => { e.stopPropagation(); const next = !this.showSessionSwitcher; this.closeFloatingPanels("sessions"); this.loadAllSessions(); this.showSessionSwitcher = next; this.requestUpdate(); }}>
               <span class="ss-name">${sid.slice(0, 8)}</span>
               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
@@ -1170,7 +1251,7 @@ export class SessionChat extends LitElement {
           ` : ""}
           <div style="flex:1"></div>
           ${this.modelSupportsThinking ? html`<div class="thinking-wrap" style="position:relative">
-            <button class="thinking-pill thinking-${this.thinkingLevel}" @click=${this.toggleThinkingMenu} title="思考: ${this.thinkingLevel}">
+            <button class="thinking-pill thinking-${this.thinkingLevel}" @click=${(e: Event) => { e.stopPropagation(); this.toggleThinkingMenu(); }} title="思考: ${this.thinkingLevel}" aria-label="切换思考等级">
               <span class="thinking-dot"></span>
               <span class="thinking-label">${this.thinkingLevel === "off" ? "Off" : this.thinkingLevel.charAt(0).toUpperCase() + this.thinkingLevel.slice(1)}</span>
               <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
@@ -1185,7 +1266,7 @@ export class SessionChat extends LitElement {
             ` : ""}
           </div>` : ""}
           <div class="model-select-wrap" style="position:relative">
-            <button class="model-pill" @click=${this.toggleModelDropdown} title="切换模型">
+            <button class="model-pill" @click=${(e: Event) => { e.stopPropagation(); this.toggleModelDropdown(); }} title="切换模型" aria-label="切换模型">
               <span class="model-pill-name">${this.modelLabel}</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
@@ -1196,18 +1277,18 @@ export class SessionChat extends LitElement {
             ` : ""}
           </div>
 
-          <button class="theme-btn" @click=${this.toggleTerminal} title="终端">
+          <button class="theme-btn" @click=${this.toggleTerminal} title="终端" aria-label="终端">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           </button>
-          <button class="theme-btn" @click=${this.toggleSettings} title="Settings">
+          <button class="theme-btn" @click=${this.toggleSettings} title="设置" aria-label="设置">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
-          <button class="theme-btn" @click=${this.toggleTheme} title="${this.theme === 'dark' ? '亮色' : '暗色'}">
+          <button class="theme-btn" @click=${this.toggleTheme} title="${this.theme === 'dark' ? '亮色' : '暗色'}" aria-label="${this.theme === 'dark' ? '切换到亮色' : '切换到暗色'}">
             ${this.theme === "dark"
               ? html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`
               : html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`}
           </button>
-          <button class="theme-btn" @click=${this.toggleShortcuts} title="快捷键 (?)">
+          <button class="theme-btn" @click=${this.toggleShortcuts} title="快捷键 (?)" aria-label="快捷键">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
           </button>
         </div>
@@ -1465,7 +1546,11 @@ export class SessionChat extends LitElement {
               </div>
               <div class="tab-content">
                 ${activeTabData ? html`
-                  <pre class="preview-code">${activeTabData.content ? unsafeHTML(this.addLineNumbers(highlightCode(activeTabData.content, activeTabData.name))) : html`<span class="preview-loading">Loading...</span>`}</pre>
+                  <pre class="preview-code">${activeTabData.error
+                    ? html`<span class="preview-loading">读取失败：${activeTabData.error}</span>`
+                    : activeTabData.content === null
+                      ? html`<span class="preview-loading">Loading...</span>`
+                      : unsafeHTML(this.addLineNumbers(highlightCode(activeTabData.content, activeTabData.name)))}</pre>
                 ` : ""}
               </div>
             </div>
@@ -1483,7 +1568,7 @@ export class SessionChat extends LitElement {
                 </div>
               </div>
             ` : ""}
-            <div class="context-bar ${this.getContextPercentage() > 0.8 ? 'ctx-crit' : ''} ${this.getContextPercentage() > 0.95 ? 'ctx-danger' : ''}" @click=${() => { this.showContextDetail = !this.showContextDetail; this.requestUpdate(); }}>
+            <div class="context-bar ${this.getContextPercentage() > 0.8 ? 'ctx-crit' : ''} ${this.getContextPercentage() > 0.95 ? 'ctx-danger' : ''}" @click=${() => { const next = !this.showContextDetail; this.closeFloatingPanels("context"); this.showContextDetail = next; this.requestUpdate(); }}>
               <div class="context-bar-fill ${this.getContextPercentage() > 0.8 ? 'ctx-warn' : ''}" style="width:${Math.min(100, this.getContextPercentage() * 100)}%"></div>
               <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.getContextTokens().toLocaleString()} / ${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</span>
               ${this.getContextPercentage() > 0.85 ? html`<span class="ctx-compact-hint" @click=${(e: Event) => { e.stopPropagation(); if (this.chatPanel?.agentInterface) { const editor = this.chatPanel.querySelector("message-editor"); const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea"); if (ta) { (ta as HTMLTextAreaElement).value = "/compact "; ta.focus(); } } }}>Compact</span>` : ""}
@@ -1582,6 +1667,7 @@ export class SessionChat extends LitElement {
             <div class="terminal-header">
               <span class="terminal-title">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Terminal
+                <span class="terminal-cwd">${this.terminalCwd}</span>
               </span>
               <button class="close-btn" @click=${this.toggleTerminal}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>

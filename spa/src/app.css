@@ -7,6 +7,7 @@
   --surface-base: #ffffff; --surface-raised: #ffffff;
   --text-base: #6f6f6f; --text-strong: #171717; --text-weak: #8f8f8f; --text-weaker: #b0b0b0;
   --border-base: rgba(0,0,0,0.08); --border-weak: rgba(0,0,0,0.05);
+  --border-color: var(--border-base);
   --shadow-border: 0 0 0 1px rgba(0,0,0,0.08);
   --shadow-border-sm: 0 0 0 0.5px rgba(0,0,0,0.07);
   --shadow-card: 0 0 0 1px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
@@ -157,9 +158,22 @@ session-list {
 }
 session-list .container { max-width: 640px; width: 100%; margin: 0 auto; padding: 40px 20px; }
 session-list .hero { text-align: center; margin-bottom: 32px; }
-session-list .hero h1 { font-size: 24px; font-weight: 500; color: var(--text-strong); }
-session-list .hero p { font-size: 14px; color: var(--text-weak); }
-session-list .actions { margin-bottom: 28px; }
+session-list .hero-kicker {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 8px;
+  margin-bottom: 12px; border-radius: 4px;
+  background: var(--bg-weak); color: var(--text-weaker);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+}
+session-list .hero h1 { font-size: 30px; font-weight: 600; color: var(--text-strong); letter-spacing: 0; }
+session-list .hero p { max-width: 420px; margin: 8px auto 0; font-size: 14px; line-height: 1.6; color: var(--text-weak); text-wrap: pretty; }
+session-list .focus-path {
+  display: inline-flex; margin-top: 14px; max-width: 100%;
+  padding: 5px 9px; border-radius: 5px;
+  background: var(--bg-weak); color: var(--text-base);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+session-list .actions { margin-bottom: 28px; text-align: center; }
 session-list .btn-new { display: inline-flex; align-items: center; gap: 6px; padding: 7px 20px; background: #2563eb; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; }
 session-list .btn-new:hover { background: #1d4ed8; }
 session-list .session-list { display: flex; flex-direction: column; }
@@ -281,9 +295,9 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
   width: 100%; height: 100%; margin: 0; padding: 14px 0;
   font-size: 13px; line-height: 1.6;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  white-space: pre-wrap; overflow-wrap: break-word; word-break: break-all;
+  white-space: pre; overflow-wrap: normal; word-break: normal;
   color: var(--text-base); tab-size: 2; background: transparent;
-  overflow-y: auto; overflow-x: hidden;
+  overflow: auto;
   counter-reset: line;
 }
 .code-line {
@@ -305,6 +319,10 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 .terminal-panel { height: 220px; flex-shrink: 0; display: flex; flex-direction: column; background: #1a1a1a; color: #e0e0e0; border-top: 1px solid #333; }
 .terminal-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; background: #252525; flex-shrink: 0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
 .terminal-title { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #999; font-weight: 500; }
+.terminal-cwd {
+  max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: #666; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-weight: 400;
+}
 .terminal-header .close-btn { width: 20px; height: 20px; border: none; background: none; cursor: pointer; color: #666; border-radius: 3px; display: flex; align-items: center; justify-content: center; padding: 0; }
 .terminal-header .close-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
 .terminal-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
@@ -327,6 +345,7 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
   --bg-base: #101010; --bg-weak: #1e1e1e; --bg-strong: #121212;
   --text-base: #ffffff9e; --text-strong: #ffffffef; --text-weak: #ffffff6c; --text-weaker: #ffffff48;
   --border-base: rgba(255,255,255,0.12); --border-weak: rgba(255,255,255,0.06);
+  --border-color: var(--border-base);
   --shadow-border: 0 0 0 1px rgba(255,255,255,0.12);
   --shadow-border-sm: 0 0 0 0.5px rgba(255,255,255,0.07);
   --shadow-card: 0 0 0 1px rgba(255,255,255,0.08);
@@ -494,7 +513,7 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 }
 .thinking-pill:hover { background: rgba(37,99,235,0.14); }
 .thinking-label { min-width: 20px; text-align: center; }
-[data-theme= dark] .thinking-pill { background: rgba(37,99,235,0.12); }
+[data-theme="dark"] .thinking-pill { background: rgba(37,99,235,0.12); }
 [data-theme=dark] .thinking-pill:hover { background: rgba(37,99,235,0.2); }
 
 /* Thinking pill v2 - per-level colors */
@@ -537,7 +556,7 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 .thinking-opt-low { color: #34d399; }
 .thinking-opt-medium { color: #fbbf24; }
 .thinking-opt-high { color: #fb7185; }
-[data-theme= dark] .thinking-dropdown { background: #1e1e1e; }
+[data-theme="dark"] .thinking-dropdown { background: #1e1e1e; }
 [data-theme=dark] .thinking-off:hover { background: rgba(255,255,255,0.04); }
 .thinking-dropdown .model-option.active.thinking-opt-off { color: var(--text-weaker) !important; }
 .thinking-dropdown .model-option.active.thinking-opt-low { color: #34d399 !important; }
@@ -597,7 +616,7 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 }
 .shortcut-row span { color: var(--text-weak); flex: 1; }
 
-[data-theme= dark] .shortcuts-panel { background: #1e1e1e; }
+[data-theme="dark"] .shortcuts-panel { background: #1e1e1e; }
 [data-theme=dark] .shortcut-row kbd { background: #2a2a2a; border-color: rgba(255,255,255,0.08); }
 
 /* Context bar */
@@ -763,7 +782,7 @@ message-list .message-body, streaming-message-container .message-body {
 }
 .ctx-detail-row span:first-child { color: var(--text-weaker); }
 .ctx-detail-row span:last-child { color: var(--text-base); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
-[data-theme= dark] .context-detail { background: #1e1e1e; }
+[data-theme="dark"] .context-detail { background: #1e1e1e; }
 
 /* Fix horizontal scrollbar in dialogs */
 .model-dialog-body { overflow-x: hidden; }

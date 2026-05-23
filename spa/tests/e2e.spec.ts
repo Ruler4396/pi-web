@@ -2,6 +2,34 @@ import { test, expect } from '@playwright/test';
 
 const AUTH = 'Basic ' + Buffer.from('opencode:ubgTQYO4raVwMXLqNsPO6je2NbsS').toString('base64');
 
+test.beforeEach(async ({ page }) => {
+  await page.setExtraHTTPHeaders({ Authorization: AUTH });
+});
+
+async function createFixtureSession(page: any) {
+  const cwd = `/tmp/pi-web-e2e-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  await page.request.post('/api/shell/exec', {
+    headers: { Authorization: AUTH, 'Content-Type': 'application/json' },
+    data: {
+      cwd: '/tmp',
+      command: `mkdir -p ${JSON.stringify(cwd)} && printf '[package]\\nname = "pi-web"\\nversion = "0.1.0"\\n' > ${JSON.stringify(`${cwd}/Cargo.toml`)}`,
+    },
+  });
+  const res = await page.request.post('/api/session', {
+    headers: { Authorization: AUTH, 'Content-Type': 'application/json' },
+    data: { cwd },
+  });
+  expect(res.ok()).toBeTruthy();
+  const session = await res.json();
+  return { cwd, id: session.id };
+}
+
+async function deleteSession(page: any, id: string) {
+  await page.request.delete(`/api/session/${id}`, {
+    headers: { Authorization: AUTH },
+  });
+}
+
 test('page loads without JS errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', err => errors.push(err.message));
@@ -41,6 +69,13 @@ test('new session dialog opens', async ({ page }) => {
   expect(dialog).not.toBeNull();
 });
 
+test('new session dialog defaults to the pi-web project directory', async ({ page }) => {
+  await page.goto('/');
+  await page.waitForSelector('.btn-new:not([disabled])');
+  await page.locator('.btn-new').click();
+  await expect(page.locator('.path-text')).toHaveText('/root/dev/pi-web');
+});
+
 test('empty state shows when no sessions', async ({ page }) => {
   await page.goto('/');
   await page.waitForTimeout(2000);
@@ -67,4 +102,30 @@ test('model selector renders in session view', async ({ page }) => {
     return el ? el.textContent?.trim() : null;
   });
   expect(pill).toBeTruthy();
+});
+
+test('code preview keeps highlighted TOML readable', async ({ page }) => {
+  const { id } = await createFixtureSession(page);
+  try {
+    await page.goto(`/#/session/${id}`);
+    await page.getByText('Cargo.toml', { exact: true }).click();
+    const preview = page.locator('.preview-code');
+    await expect(preview).toContainText('[package]');
+    await expect(preview).not.toContainText('hl-kw');
+  } finally {
+    await deleteSession(page, id);
+  }
+});
+
+test('opening terminal closes model dropdown', async ({ page }) => {
+  const { id } = await createFixtureSession(page);
+  try {
+    await page.goto(`/#/session/${id}`);
+    await page.locator('.model-pill').click();
+    await expect(page.locator('.model-dropdown')).toBeVisible();
+    await page.getByTitle('终端').click();
+    await expect(page.locator('.model-dropdown')).toHaveCount(0);
+  } finally {
+    await deleteSession(page, id);
+  }
 });

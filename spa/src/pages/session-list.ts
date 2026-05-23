@@ -7,6 +7,8 @@ interface DirEntry {
   type: "file" | "directory";
 }
 
+const FOCUS_CWD = "/root/dev/pi-web";
+
 const plusSvg = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
 const folderSvg = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
 const folderOpenSvg = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h2.5L10 7h10a2 2 0 0 1 2 2v1"/></svg>`;
@@ -59,7 +61,8 @@ export class SessionList extends LitElement {
     try {
       const res = await fetch("/api/session");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      this.sessions = await res.json();
+      const data = await res.json();
+      this.sessions = data.filter((s: any) => s.id !== "sessions");
     } catch (e: any) {
       this.error = e.message || "Failed to load sessions";
       this.sessions = [];
@@ -68,6 +71,9 @@ export class SessionList extends LitElement {
 
   async deleteSession(id: string, e: Event) {
     e.stopPropagation();
+    const session = this.sessions.find(s => s.id === id);
+    const label = session?.name || session?.cwd || id.slice(0, 8);
+    if (!confirm(`删除会话「${label}」？此操作不可撤销。`)) return;
     try {
       await fetch(`/api/session/${id}`, { method: "DELETE" });
       this.sessions = this.sessions.filter(s => s.id !== id);
@@ -83,10 +89,10 @@ export class SessionList extends LitElement {
   }
 
   openNewSessionDialog() {
-    this.cwd = "/root";
+    this.cwd = FOCUS_CWD;
     this.showDialog = true;
     this.error = "";
-    this.loadDirs("/root");
+    this.loadDirs(FOCUS_CWD);
   }
 
   cancelDialog() {
@@ -187,7 +193,11 @@ export class SessionList extends LitElement {
       sessions.sort((a, b) => a.active === b.active ? 0 : a.active ? -1 : 1);
       groups.push({ dir, sessions });
     }
-    groups.sort((a, b) => a.dir.localeCompare(b.dir));
+    groups.sort((a, b) => {
+      if (a.dir === FOCUS_CWD) return -1;
+      if (b.dir === FOCUS_CWD) return 1;
+      return a.dir.localeCompare(b.dir);
+    });
     return groups;
   }
 
@@ -204,12 +214,14 @@ export class SessionList extends LitElement {
     return html`
       <div class="container" style="min-height:400px">
         <div class="hero">
+          <div class="hero-kicker">Personal coding cockpit</div>
           <h1>Pi Web</h1>
-          <p>AI coding assistant</p>
+          <p>默认聚焦 rustpi 前端工作区，进入后直接编写、查看文件和运行终端。</p>
+          <div class="focus-path">${FOCUS_CWD}</div>
         </div>
         <div class="actions">
           <button class="btn-new" @click=${this.openNewSessionDialog} ?disabled=${this.loading}>
-            ${plusSvg} 新建会话
+            ${plusSvg} 新建 pi-web 会话
           </button>
         </div>
         ${this.error ? html`<div class="error-msg">${this.error}</div>` : ""}
