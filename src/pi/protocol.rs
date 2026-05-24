@@ -148,6 +148,26 @@ impl RpcCommand {
         Self { command_type: "prompt_get".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra: serde_json::json!({"name": name}) }
     }
 
+    // === Runtime commands ===
+    pub fn compact(custom_instructions: Option<&str>) -> Self {
+        let mut extra = serde_json::json!({});
+        if let Some(value) = custom_instructions.map(str::trim).filter(|value| !value.is_empty()) {
+            extra["customInstructions"] = serde_json::Value::String(value.into());
+        }
+        Self { command_type: "compact".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
+    }
+
+    pub fn subagent_plan(objective: &str, cwd: Option<&str>, max_agents: Option<u32>) -> Self {
+        let mut extra = serde_json::json!({"objective": objective});
+        if let Some(cwd) = cwd.map(str::trim).filter(|value| !value.is_empty()) {
+            extra["cwd"] = serde_json::Value::String(cwd.into());
+        }
+        if let Some(max_agents) = max_agents {
+            extra["maxAgents"] = serde_json::Value::Number(max_agents.into());
+        }
+        Self { command_type: "subagent_plan".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
+    }
+
     // === Hermes commands ===
     pub fn goal(goal_text: &str, max_iterations: u32) -> Self {
         Self {
@@ -252,10 +272,21 @@ pub enum AgentEvent {
     AutoCompactionStart { reason: Option<String> },
     #[serde(rename = "auto_compaction_end")]
     AutoCompactionEnd {
+        result: Option<Value>,
         aborted: bool,
         #[serde(rename = "willRetry")]
         will_retry: Option<bool>,
+        #[serde(rename = "errorMessage")]
+        error_message: Option<String>,
     },
+    #[serde(rename = "subagent_plan_start")]
+    SubAgentPlanStart {
+        objective: String,
+        #[serde(rename = "requestedAgents")]
+        requested_agents: usize,
+    },
+    #[serde(rename = "subagent_plan_ready")]
+    SubAgentPlanReady { plan: Value },
     #[serde(rename = "auto_retry_start")]
     AutoRetryStart {
         attempt: i32,
@@ -356,6 +387,51 @@ mod tests {
                 total_iterations: 3,
                 summary: Some(summary),
             } if summary.contains("no-progress")
+        ));
+    }
+
+    #[test]
+    fn runtime_commands_serialize_to_pi_rust_rpc_contract() {
+        let compact = serde_json::to_value(RpcCommand::compact(Some("keep current task"))).unwrap();
+        assert_eq!(compact["type"], "compact");
+        assert_eq!(compact["customInstructions"], "keep current task");
+
+        let plan = serde_json::to_value(RpcCommand::subagent_plan(
+            "audit commands",
+            Some("/root/dev/pi-web"),
+            Some(3),
+        ))
+        .unwrap();
+        assert_eq!(plan["type"], "subagent_plan");
+        assert_eq!(plan["objective"], "audit commands");
+        assert_eq!(plan["cwd"], "/root/dev/pi-web");
+        assert_eq!(plan["maxAgents"], 3);
+    }
+
+    #[test]
+    fn parses_subagent_plan_events_from_pi_rust() {
+        let start = serde_json::from_value::<AgentEvent>(json!({
+            "type": "subagent_plan_start",
+            "objective": "audit commands",
+            "requestedAgents": 3
+        }))
+        .expect("parse subagent_plan_start");
+        assert!(matches!(
+            start,
+            AgentEvent::SubAgentPlanStart {
+                objective,
+                requested_agents: 3,
+            } if objective == "audit commands"
+        ));
+
+        let ready = serde_json::from_value::<AgentEvent>(json!({
+            "type": "subagent_plan_ready",
+            "plan": {"schema": "pi.subagent.plan.v1"}
+        }))
+        .expect("parse subagent_plan_ready");
+        assert!(matches!(
+            ready,
+            AgentEvent::SubAgentPlanReady { plan } if plan["schema"] == "pi.subagent.plan.v1"
         ));
     }
 }

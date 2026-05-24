@@ -94,6 +94,8 @@ export class SessionChat extends LitElement {
     { cmd: "/init", desc: "初始化项目分析", action: "ai" },
     { cmd: "/plan", desc: "制定实施计划", action: "ai" },
     { cmd: "/goal", desc: "设定长期目标，自主迭代执行", action: "ai" },
+    { cmd: "/agents", desc: "生成子代理并行计划", action: "ai" },
+    { cmd: "/subagents", desc: "生成子代理并行计划", action: "ai" },
     { cmd: "/fork", desc: "分支对话", action: "ai" },
     { cmd: "/compact", desc: "压缩上下文", action: "ai" },
     { cmd: "/btw", desc: "临时提问，不污染对话", action: "ai" },
@@ -119,6 +121,18 @@ export class SessionChat extends LitElement {
     completed?: boolean;
     summary?: string;
     description?: string;
+  } | null = null;
+  @state() compactionStatus: {
+    running: boolean;
+    reason?: string;
+    errorMessage?: string;
+  } | null = null;
+  @state() subAgentPlanStatus: {
+    running: boolean;
+    objective?: string;
+    requestedAgents?: number;
+    taskCount?: number;
+    mode?: string;
   } | null = null;
   _gitInterval: any = null;
   @state() runningTools: string[] = [];
@@ -493,6 +507,37 @@ export class SessionChat extends LitElement {
           this.runningTools = [...this.runningTools, tn];
           this.requestUpdate();
         }
+      }
+      if (event.type === "auto_compaction_start") {
+        this.compactionStatus = { running: true, reason: event.reason || "manual" };
+        this.requestUpdate();
+      }
+      if (event.type === "auto_compaction_end") {
+        this.compactionStatus = {
+          running: false,
+          errorMessage: event.errorMessage || "",
+        };
+        this.requestUpdate();
+      }
+      if (event.type === "subagent_plan_start") {
+        this.subAgentPlanStatus = {
+          running: true,
+          objective: event.objective || "",
+          requestedAgents: event.requestedAgents || 0,
+        };
+        this.requestUpdate();
+      }
+      if (event.type === "subagent_plan_ready") {
+        const plan = event.plan || {};
+        this.subAgentPlanStatus = {
+          running: false,
+          objective: plan.objective || this.subAgentPlanStatus?.objective || "",
+          requestedAgents: plan.maxParallel || plan.max_parallel || this.subAgentPlanStatus?.requestedAgents || 0,
+          taskCount: Array.isArray(plan.tasks) ? plan.tasks.length : 0,
+          mode: plan.mode || "",
+        };
+        this.showToast("info", "Sub-agent plan ready");
+        this.requestUpdate();
       }
     });
     this.chatPanel = new ChatPanel();
@@ -992,7 +1037,7 @@ export class SessionChat extends LitElement {
       return; // pi_rust handles autonomous execution
     }
     // Pass-through AI commands
-    if (["/fork", "/plan", "/init", "/compact"].some(x => c === x || c.startsWith(x + " "))) {
+    if (["/fork", "/plan", "/init", "/compact", "/agents", "/subagents"].some(x => c === x || c.startsWith(x + " "))) {
       return;
     }
   }
@@ -1453,6 +1498,20 @@ export class SessionChat extends LitElement {
               <span class="goal-label">${this.goalStatus.running
                 ? `Goal ${((this.goalStatus.iteration || 0) + 1).toString()}${this.goalStatus.maxIterations ? `/${this.goalStatus.maxIterations}` : ""}`
                 : this.goalStatus.completed ? "Goal done" : "Goal stopped"}</span>
+            </div>
+          ` : ""}
+          ${this.compactionStatus?.running ? html`
+            <div class="tool-indicator" title=${this.compactionStatus.reason || "Compacting context"}>
+              <span class="tool-spinner"></span>
+              <span class="tool-label">Compacting</span>
+            </div>
+          ` : ""}
+          ${this.subAgentPlanStatus ? html`
+            <div class="goal-indicator ${this.subAgentPlanStatus.running ? 'running' : 'done'}" title=${this.subAgentPlanStatus.objective || "Sub-agent plan"}>
+              ${this.subAgentPlanStatus.running ? html`<span class="tool-spinner"></span>` : html`<span class="goal-dot"></span>`}
+              <span class="goal-label">${this.subAgentPlanStatus.running
+                ? "Planning agents"
+                : `Agents ${this.subAgentPlanStatus.taskCount || this.subAgentPlanStatus.requestedAgents || 1}`}</span>
             </div>
           ` : ""}
           ${this.runningTools.length > 0 ? html`

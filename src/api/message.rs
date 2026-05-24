@@ -50,16 +50,27 @@ pub async fn send(
 
     let message = body["message"].as_str().unwrap_or_default().to_string();
     let thinking_level = body["thinkingLevel"].as_str().unwrap_or("off");
+    let cwd = body["cwd"].as_str();
     let mut rx = agent.subscribe();
-    // Check if this is a /goal command
+    // Bridge first-class slash commands to pi_rust RPC instead of burning a model turn.
     let cmd = if let Some(goal_text) = message.strip_prefix("/goal ") {
         RpcCommand::goal(goal_text.trim(), 30)
+    } else if message.trim() == "/compact" {
+        RpcCommand::compact(None)
+    } else if let Some(instructions) = message.strip_prefix("/compact ") {
+        RpcCommand::compact(Some(instructions.trim()))
+    } else if let Some(objective) = message
+        .strip_prefix("/agents ")
+        .or_else(|| message.strip_prefix("/subagents "))
+    {
+        RpcCommand::subagent_plan(objective.trim(), cwd, Some(3))
     } else {
         let mut cmd = RpcCommand::prompt(&message);
         cmd.extra = serde_json::json!({"thinkingLevel": thinking_level});
         cmd
     };
-    agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let one_shot_command = matches!(cmd.command_type.as_str(), "compact" | "subagent_plan");
+    let request_id = agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let notify_config = state.config.clone();
     let notify_session_id = id.clone();
     let notify_prompt = message.clone();
@@ -92,11 +103,18 @@ pub async fn send(
                         crate::pi::protocol::AgentEvent::PromptChainEvent { .. } => "prompt_chain_event",
                         crate::pi::protocol::AgentEvent::AutoCompactionStart { .. } => "auto_compaction_start",
                         crate::pi::protocol::AgentEvent::AutoCompactionEnd { .. } => "auto_compaction_end",
+                        crate::pi::protocol::AgentEvent::SubAgentPlanStart { .. } => "subagent_plan_start",
+                        crate::pi::protocol::AgentEvent::SubAgentPlanReady { .. } => "subagent_plan_ready",
                         crate::pi::protocol::AgentEvent::AutoRetryStart { .. } => "auto_retry_start",
                         crate::pi::protocol::AgentEvent::AutoRetryEnd { .. } => "auto_retry_end",
+                        crate::pi::protocol::AgentEvent::CommandResponse { .. } => "response",
                         _ => continue,
                     };
                     yield Ok(Event::default().event(event_type).data(json));
+
+                    if one_shot_command && matches!(&event, crate::pi::protocol::AgentEvent::CommandResponse { id, .. } if id == &request_id) {
+                        break;
+                    }
 
                     if matches!(event, crate::pi::protocol::AgentEvent::AgentEnd { .. }) {
                         if let Some(message) = completion_notice {

@@ -21,7 +21,8 @@ This document defines the current user-facing slash command contract between `pi
 | `/goal <text>` | Sent to the active session and shown as a Goal status pill. | `goal` with bounded `maxIterations`. | Ends on `goal_end`, `agent_end`, abort, max iterations, turn budget, or repeated no-progress guard. |
 | `/plan ...` | Forwarded to the model as prompt text. | `prompt`. | Ends on `agent_end`. |
 | `/init ...` | Forwarded to the model as prompt text. | `prompt`. | Ends on `agent_end`. |
-| `/compact ...` | Forwarded to the model/runtime as prompt text unless the runtime adds a dedicated RPC command. | `prompt` today. | Ends on `agent_end`. |
+| `/compact ...` | Sent as a runtime command and shown as compaction status. | `compact` with optional `customInstructions`. | Ends on the matching `response`; it must not burn a normal model chat turn first. |
+| `/agents <text>`, `/subagents <text>` | Generates a bounded sub-agent plan and renders it as an assistant message. | `subagent_plan`. | Ends on the matching `response` after `subagent_plan_start` and `subagent_plan_ready`. |
 | `/fork ...` | Forwarded to the model/runtime as prompt text unless the runtime adds a dedicated RPC command. | `prompt` today. | Ends on `agent_end`. |
 | `/btw ...` | Forwarded as a prompt with frontend-only temporary-message intent today. | `prompt`. | Ends on `agent_end`. |
 
@@ -43,6 +44,20 @@ runtime receives enough context to act without guessing which file was intended.
 - It stops after repeated normalized no-progress assistant responses.
 - It remains abortable through the existing `abort` RPC command.
 - The frontend must surface running, completed, and stopped states instead of treating `/goal` as a normal opaque chat response.
+
+## Context Cache And Sub-Agent Planning
+
+The current sub-agent contract is a planning contract, not an execution contract. `pi_rust`
+generates a `pi.subagent.plan.v1` payload that records task boundaries, context budget,
+memory policy, write scope, dependency hints, and a stop policy. The frontend displays the
+plan and does not pretend that child agents already ran.
+
+The cache discipline follows these rules:
+
+- Cache scope is explicit (`workspace+session`) and invalidates on git diff changes, referenced file changes, or session compaction.
+- Sub-agents receive bounded context slices: task-relevant memory summaries, explicit file mentions, and the current diff, not the full chat history.
+- Shared UI or broad refactor work defaults to `single_agent`; parallel plans are only safe when tasks have distinct read/write surfaces.
+- Every planned child task includes a progress requirement, a no-progress turn limit, and a completion gate that reports changed paths, verification, and residual risk.
 
 ## Completion Notification
 

@@ -67,7 +67,7 @@ export class HttpAgent {
       const res = await fetch(`/api/session/${this.sessionId}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageForRuntime, thinkingLevel: this._state.thinkingLevel || "off" }),
+        body: JSON.stringify({ message: messageForRuntime, thinkingLevel: this._state.thinkingLevel || "off", cwd: this.cwd }),
         signal,
       });
 
@@ -295,8 +295,66 @@ export class HttpAgent {
                 } as any);
                 break;
               case "auto_compaction_start":
+                this._state.compactionStatus = {
+                  running: true,
+                  reason: raw.reason || "manual",
+                };
+                await this.emit({
+                  type: "auto_compaction_start",
+                  reason: this._state.compactionStatus.reason,
+                } as any);
                 break;
               case "auto_compaction_end":
+                this._state.compactionStatus = {
+                  running: false,
+                  aborted: !!raw.aborted,
+                  willRetry: !!(raw.willRetry || raw.will_retry),
+                  errorMessage: raw.errorMessage || raw.error_message || "",
+                };
+                await this.emit({
+                  type: "auto_compaction_end",
+                  ...this._state.compactionStatus,
+                  result: raw.result || null,
+                } as any);
+                break;
+              case "subagent_plan_start":
+                this._state.subAgentPlanStatus = {
+                  running: true,
+                  objective: raw.objective || "",
+                  requestedAgents: raw.requestedAgents || raw.requested_agents || 0,
+                };
+                await this.emit({
+                  type: "subagent_plan_start",
+                  ...this._state.subAgentPlanStatus,
+                } as any);
+                break;
+              case "subagent_plan_ready": {
+                this._state.subAgentPlanStatus = {
+                  ...(this._state.subAgentPlanStatus || {}),
+                  running: false,
+                  plan: raw.plan || null,
+                };
+                const planText = this.renderSubAgentPlan(raw.plan || {});
+                this._state.addMessage({ role: "assistant", content: [{ type: "text", text: planText }] });
+                messageSent = true;
+                await this.emit({
+                  type: "subagent_plan_ready",
+                  plan: raw.plan || null,
+                } as any);
+                break;
+              }
+              case "response":
+                if (raw.success === false) {
+                  const error = raw.error || "Command failed";
+                  this._state.errorMessage = error;
+                  this._state.addMessage({ role: "assistant", content: [{ type: "text", text: `Error: ${error}` }], stopReason: "error", errorMessage: error });
+                  messageSent = true;
+                  await this.emit({ type: "error", error } as any);
+                } else if (raw.data?.summary) {
+                  const text = `上下文已压缩。\n\n摘要：${raw.data.summary}`;
+                  this._state.addMessage({ role: "assistant", content: [{ type: "text", text }] });
+                  messageSent = true;
+                }
                 break;
               case "auto_retry_start":
                 break;
@@ -327,6 +385,26 @@ export class HttpAgent {
 
   setCwd(cwd: string) {
     if (cwd) this.cwd = cwd;
+  }
+
+  private renderSubAgentPlan(plan: any): string {
+    const tasks = Array.isArray(plan.tasks) ? plan.tasks : [];
+    const lines = [
+      `子代理计划已生成：${plan.mode || "single_agent"}，最大并行 ${plan.maxParallel || plan.max_parallel || 1}`,
+      "",
+      `目标：${plan.objective || ""}`,
+      "",
+      "任务：",
+      ...tasks.map((task: any, idx: number) => {
+        const parallel = task.canRunParallel || task.can_run_parallel ? "可并行" : "串行";
+        const budget = task.contextBudgetTokens || task.context_budget_tokens || 0;
+        return `${idx + 1}. ${task.title || task.id || "Task"} (${parallel}, ${budget} tokens)`;
+      }),
+      "",
+      `上下文策略：${plan.cachePolicy?.contextRule || plan.cache_policy?.context_rule || "bounded context"}`,
+      `停止策略：${plan.stopPolicy?.completionGate || plan.stop_policy?.completion_gate || "report verification and risk"}`,
+    ];
+    return lines.filter((line, idx) => line || idx < 4).join("\n");
   }
 
   private async expandFileMentions(messageText: string): Promise<string> {
@@ -453,6 +531,19 @@ class HttpAgentState implements AgentState {
     completed?: boolean;
     totalIterations?: number;
     summary?: string;
+  };
+  compactionStatus?: {
+    running: boolean;
+    reason?: string;
+    aborted?: boolean;
+    willRetry?: boolean;
+    errorMessage?: string;
+  };
+  subAgentPlanStatus?: {
+    running: boolean;
+    objective?: string;
+    requestedAgents?: number;
+    plan?: any;
   };
   model: Model<any> = { provider: "deepseek", id: "deepseek-chat", label: "DeepSeek Chat" } as any;
 
