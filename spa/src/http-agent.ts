@@ -223,6 +223,11 @@ export class HttpAgent {
                 break;
               case "tool_execution_start":
                 this._state.pendingToolCalls.add(raw.toolCallId || raw.tool_call_id || "");
+                this._state.toolRunStatus = {
+                  running: true,
+                  active: [...this._state.pendingToolCalls].filter(Boolean),
+                  lastTool: raw.toolName || raw.tool_name || "",
+                };
                 await this.emit({
                   type: "tool_execution_start",
                   toolCallId: raw.toolCallId || raw.tool_call_id || "",
@@ -241,6 +246,12 @@ export class HttpAgent {
                 break;
               case "tool_execution_end":
                 this._state.pendingToolCalls.delete(raw.toolCallId || raw.tool_call_id || "");
+                this._state.toolRunStatus = {
+                  running: this._state.pendingToolCalls.size > 0,
+                  active: [...this._state.pendingToolCalls].filter(Boolean),
+                  lastTool: raw.toolName || raw.tool_name || "",
+                  lastError: raw.is_error || raw.isError ? "tool failed" : "",
+                };
                 await this.emit({
                   type: "tool_execution_end",
                   toolCallId: raw.toolCallId || raw.tool_call_id || "",
@@ -323,6 +334,10 @@ export class HttpAgent {
                   objective: raw.objective || "",
                   requestedAgents: raw.requestedAgents || raw.requested_agents || 0,
                 };
+                this._state.subAgentStatus = {
+                  ...this._state.subAgentPlanStatus,
+                  phase: "planning",
+                };
                 await this.emit({
                   type: "subagent_plan_start",
                   ...this._state.subAgentPlanStatus,
@@ -333,6 +348,10 @@ export class HttpAgent {
                   ...(this._state.subAgentPlanStatus || {}),
                   running: false,
                   plan: raw.plan || null,
+                };
+                this._state.subAgentStatus = {
+                  ...this._state.subAgentPlanStatus,
+                  phase: "planned",
                 };
                 const planText = this.renderSubAgentPlan(raw.plan || {});
                 this._state.addMessage({ role: "assistant", content: [{ type: "text", text: planText }] });
@@ -352,12 +371,28 @@ export class HttpAgent {
                   taskCount: raw.taskCount || raw.task_count || 0,
                   mode: "executing",
                 };
+                this._state.subAgentStatus = {
+                  ...this._state.subAgentPlanStatus,
+                  phase: "executing",
+                };
                 await this.emit({ type: "subagent_execution_start", ...raw } as any);
                 break;
               case "subagent_task_start":
+                this._state.subAgentStatus = {
+                  ...(this._state.subAgentStatus || { running: true }),
+                  running: true,
+                  phase: "task",
+                  currentTask: raw.taskId || raw.task_id || raw.id || raw.title || "",
+                };
                 await this.emit({ type: "subagent_task_start", ...raw } as any);
                 break;
               case "subagent_task_end":
+                this._state.subAgentStatus = {
+                  ...(this._state.subAgentStatus || { running: true }),
+                  phase: "task_done",
+                  currentTask: raw.taskId || raw.task_id || raw.id || raw.title || "",
+                  lastError: raw.error || "",
+                };
                 await this.emit({ type: "subagent_task_end", ...raw } as any);
                 break;
               case "subagent_execution_end": {
@@ -365,6 +400,11 @@ export class HttpAgent {
                   ...(this._state.subAgentPlanStatus || {}),
                   running: false,
                   completed: !!raw.completed,
+                };
+                this._state.subAgentStatus = {
+                  ...this._state.subAgentPlanStatus,
+                  phase: "complete",
+                  summary: raw.summary || "",
                 };
                 const text = this.renderSubAgentExecution(raw.results || {}, raw.summary || "");
                 this._state.addMessage({ role: "assistant", content: [{ type: "text", text }] });
@@ -595,6 +635,30 @@ class HttpAgentState implements AgentState {
     mode?: string;
     completed?: boolean;
     plan?: any;
+  };
+  subAgentStatus?: {
+    running: boolean;
+    objective?: string;
+    requestedAgents?: number;
+    taskCount?: number;
+    mode?: string;
+    completed?: boolean;
+    plan?: any;
+    phase?: string;
+    currentTask?: string;
+    lastError?: string;
+    summary?: string;
+  };
+  toolRunStatus?: {
+    running: boolean;
+    active?: string[];
+    lastTool?: string;
+    lastError?: string;
+  };
+  contextStatus?: {
+    tokens?: number;
+    max?: number;
+    percentage?: number;
   };
   model: Model<any> = { provider: "deepseek", id: "deepseek-chat", label: "DeepSeek Chat" } as any;
 

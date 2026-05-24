@@ -130,6 +130,47 @@ test('opening terminal closes model dropdown', async ({ page }) => {
   }
 });
 
+test('agent cockpit shell exposes inspector and bottom panel', async ({ page }) => {
+  const { id } = await createFixtureSession(page);
+  try {
+    await page.goto(`/#/session/${id}`);
+    await expect(page.locator('.cockpit-main')).toBeVisible();
+    await expect(page.locator('.chat-workbench')).toBeVisible();
+    await expect(page.locator('.inspector-panel')).toBeVisible();
+    await expect(page.locator('.inspector-tab.active')).toContainText('Agent');
+    await expect(page.locator('.bottom-panel')).toHaveCount(1);
+    await expect(page.locator('.bottom-panel')).not.toHaveClass(/active/);
+  } finally {
+    await deleteSession(page, id);
+  }
+});
+
+test('context bar opens the context inspector', async ({ page }) => {
+  const { id } = await createFixtureSession(page);
+  try {
+    await page.goto(`/#/session/${id}`);
+    await page.locator('.context-bar').click();
+    await expect(page.locator('.inspector-panel')).toBeVisible();
+    await expect(page.locator('.inspector-tab.active')).toContainText('Context');
+    await expect(page.locator('.inspector-section')).toContainText('Token usage');
+  } finally {
+    await deleteSession(page, id);
+  }
+});
+
+test('terminal bottom panel advertises one-shot shell limits', async ({ page }) => {
+  const { id } = await createFixtureSession(page);
+  try {
+    await page.goto(`/#/session/${id}`);
+    await page.getByTitle('终端').click();
+    await expect(page.locator('.bottom-panel')).toHaveClass(/active/);
+    await expect(page.locator('.bottom-tab.active')).toContainText('Terminal');
+    await expect(page.locator('.terminal-limit')).toContainText('one-shot shell');
+  } finally {
+    await deleteSession(page, id);
+  }
+});
+
 test('filtered slash command menu stays anchored to composer', async ({ page }) => {
   const { id } = await createFixtureSession(page);
   try {

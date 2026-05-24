@@ -93,9 +93,9 @@ export class SessionChat extends LitElement {
     { cmd: "/keys", desc: "API 密钥", action: "ui" },
     { cmd: "/init", desc: "初始化项目分析", action: "ai" },
     { cmd: "/plan", desc: "制定实施计划", action: "ai" },
-    { cmd: "/goal", desc: "设定长期目标，自主迭代执行", action: "ai" },
-    { cmd: "/agents", desc: "规划并执行真实子代理任务", action: "ai" },
-    { cmd: "/agents-plan", desc: "只生成子代理计划", action: "ai" },
+    { cmd: "/goal", desc: "长期自主任务，完成后 Hermes 微信通知", action: "ai" },
+    { cmd: "/agents", desc: "真实子代理执行", action: "ai" },
+    { cmd: "/agents-plan", desc: "只规划不执行", action: "ai" },
     { cmd: "/subagents", desc: "规划并执行真实子代理任务", action: "ai" },
     { cmd: "/fork", desc: "分支对话", action: "ai" },
     { cmd: "/compact", desc: "压缩上下文", action: "ai" },
@@ -119,6 +119,7 @@ export class SessionChat extends LitElement {
     goal?: string;
     iteration?: number;
     maxIterations?: number;
+    totalIterations?: number;
     completed?: boolean;
     summary?: string;
     description?: string;
@@ -158,6 +159,8 @@ export class SessionChat extends LitElement {
   @state() private _slashFilterText = "";
   @state() private streamStatus: "idle" | "thinking" | "receiving" | "tool" = "idle";
   @state() private streamLabel = "";
+  @state() private inspectorOpen = true;
+  @state() private inspectorTab: "agent" | "context" | "model" = "agent";
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
   private msgInterval = 0;
@@ -1618,6 +1621,93 @@ export class SessionChat extends LitElement {
     return lines.map((line, i) => '<span class="code-line"><span class="line-num">' + (i + 1) + '</span>' + line + '</span>').join("\n");
   }
 
+  private openContextInspector(e: Event) {
+    e.stopPropagation();
+    this.closeFloatingPanels("context");
+    this.showContextDetail = false;
+    this.inspectorOpen = true;
+    this.inspectorTab = "context";
+    this.requestUpdate();
+  }
+
+  private renderInspector() {
+    if (!this.inspectorOpen) return "";
+    const pct = this.getContextPercentage();
+    return html`
+      <aside class="inspector-panel" aria-label="Agent inspector">
+        <div class="inspector-header">
+          <span>Inspector</span>
+          <button class="inspector-close" @click=${() => { this.inspectorOpen = false; this.requestUpdate(); }} aria-label="Close inspector">×</button>
+        </div>
+        <div class="inspector-tabs">
+          ${(["agent", "context", "model"] as const).map(tab => html`
+            <button class="inspector-tab ${this.inspectorTab === tab ? 'active' : ''}" @click=${() => { this.inspectorTab = tab; this.requestUpdate(); }}>
+              ${tab === "agent" ? "Agent" : tab === "context" ? "Context" : "Model"}
+            </button>
+          `)}
+        </div>
+        <div class="inspector-body">
+          ${this.inspectorTab === "agent" ? html`
+            <section class="inspector-section">
+              <div class="inspector-section-title">Goal</div>
+              ${this.goalStatus ? html`
+                <div class="agent-timeline">
+                  <div class="timeline-row ${this.goalStatus.running ? 'running' : this.goalStatus.completed ? 'done' : 'stopped'}">
+                    <span class="timeline-dot"></span>
+                    <span>${this.goalStatus.running ? "Running" : this.goalStatus.completed ? "Completed" : "Stopped"}</span>
+                    <code>${this.goalStatus.iteration || this.goalStatus.totalIterations || 0}/${this.goalStatus.maxIterations || "?"}</code>
+                  </div>
+                  <div class="inspector-note">${this.goalStatus.summary || this.goalStatus.description || this.goalStatus.goal || "Waiting for goal activity"}</div>
+                </div>
+              ` : html`<div class="inspector-empty">No /goal task is running.</div>`}
+            </section>
+            <section class="inspector-section">
+              <div class="inspector-section-title">Sub-agents</div>
+              ${this.subAgentPlanStatus ? html`
+                <div class="agent-timeline">
+                  <div class="timeline-row ${this.subAgentPlanStatus.running ? 'running' : 'done'}">
+                    <span class="timeline-dot"></span>
+                    <span>${this.subAgentPlanStatus.running ? "Running" : "Ready"}</span>
+                    <code>${this.subAgentPlanStatus.taskCount || this.subAgentPlanStatus.requestedAgents || 0} tasks</code>
+                  </div>
+                  <div class="inspector-note">${this.subAgentPlanStatus.objective || this.subAgentPlanStatus.mode || "Sub-agent execution state"}</div>
+                </div>
+              ` : html`<div class="inspector-empty">Use /agents to create a structured execution plan.</div>`}
+            </section>
+            <section class="inspector-section">
+              <div class="inspector-section-title">Tools</div>
+              ${this.runningTools.length ? this.runningTools.map(tool => html`
+                <div class="status-row active"><span>${tool}</span><code>running</code></div>
+              `) : html`<div class="inspector-empty">No tool is currently running.</div>`}
+            </section>
+          ` : ""}
+          ${this.inspectorTab === "context" ? html`
+            <section class="inspector-section">
+              <div class="inspector-section-title">Token usage</div>
+              <div class="context-meter"><span style="width:${Math.min(100, pct * 100)}%"></span></div>
+              <div class="status-row"><span>Used</span><code>${this.getContextTokens().toLocaleString()}</code></div>
+              <div class="status-row"><span>Limit</span><code>${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</code></div>
+              <div class="status-row"><span>Usage</span><code>${(pct * 100).toFixed(1)}%</code></div>
+              <div class="status-row"><span>Messages</span><code>${this.agent?.state.messages.length || 0}</code></div>
+              <div class="status-row"><span>Compaction</span><code>${this.compactionStatus?.running ? "running" : pct > 0.85 ? "recommended" : "idle"}</code></div>
+            </section>
+          ` : ""}
+          ${this.inspectorTab === "model" ? html`
+            <section class="inspector-section">
+              <div class="inspector-section-title">Runtime</div>
+              <div class="status-row"><span>Provider</span><code>${this.modelProvider}</code></div>
+              <div class="status-row"><span>Model</span><code>${this.modelLabel}</code></div>
+              <div class="status-row"><span>Thinking</span><code>${this.thinkingLevel}</code></div>
+              <div class="status-row"><span>Stream</span><code>${this.agent?.state.isStreaming ? "active" : this.streamStatus}</code></div>
+              <div class="status-row"><span>CWD</span><code>${this.sessionCwd}</code></div>
+              ${(this.agent?.state as any)?.errorMessage ? html`<div class="provider-error">${(this.agent?.state as any).errorMessage}</div>` : ""}
+            </section>
+          ` : ""}
+        </div>
+      </aside>
+    `;
+  }
+
   render() {
     if (this.error) {
       return html`<div class="error-wrap">
@@ -1731,6 +1821,9 @@ export class SessionChat extends LitElement {
 
           <button class="theme-btn" @click=${this.toggleTerminal} title="终端" aria-label="终端">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          </button>
+          <button class="theme-btn ${this.inspectorOpen ? 'active' : ''}" @click=${() => { this.inspectorOpen = !this.inspectorOpen; this.requestUpdate(); }} title="Inspector" aria-label="Inspector">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><line x1="14" y1="4" x2="14" y2="20"/><line x1="8" y1="8" x2="10" y2="8"/><line x1="8" y1="12" x2="10" y2="12"/></svg>
           </button>
           <button class="theme-btn" @click=${this.toggleSettings} title="设置" aria-label="设置">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1928,9 +2021,9 @@ export class SessionChat extends LitElement {
             </div>
           </div>
         ` : ""}
-        <div class="main-row" style="flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden">
+        <div class="main-row cockpit-main" style="flex:1;min-height:0;display:flex;flex-direction:row;overflow:hidden">
           <!-- Sidebar -->
-          <div class="sidebar" style="width:260px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-base);border-right:0.5px solid rgba(255,255,255,0.07);flex-shrink:0;position:relative">
+          <div class="sidebar workbench-sidebar" style="width:260px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg-base);border-right:0.5px solid rgba(255,255,255,0.07);flex-shrink:0;position:relative">
             <div class="sidebar-header">
               <span style="font-size:12px;font-weight:500;color:var(--text-weak);letter-spacing:0.04em">FILES</span>
               <div class="sidebar-header-actions">
@@ -2010,17 +2103,17 @@ export class SessionChat extends LitElement {
           ` : ""}
 
           <!-- Chat -->
-          <div style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
+          <div class="chat-workbench" style="flex:1;min-height:0;display:flex;flex-direction:column;position:relative">
             ${showWelcome ? html`
               <div class="welcome">
                 <div class="welcome-inner">
                   <div class="logo"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-                  <div class="title">What can I help with?</div>
-                  <div class="subtitle">Type a message below to start a conversation</div>
+                  <div class="title">rustpi cockpit</div>
+                  <div class="subtitle">${this.sessionCwd} · ${this.modelLabel} · /goal /agents /compact</div>
                 </div>
               </div>
             ` : ""}
-            <div class="context-bar ${this.getContextPercentage() > 0.8 ? 'ctx-crit' : ''} ${this.getContextPercentage() > 0.95 ? 'ctx-danger' : ''}" @click=${(e: Event) => { e.stopPropagation(); const next = !this.showContextDetail; this.closeFloatingPanels("context"); this.showContextDetail = next; this.requestUpdate(); }}>
+            <div class="context-bar ${this.getContextPercentage() > 0.8 ? 'ctx-crit' : ''} ${this.getContextPercentage() > 0.95 ? 'ctx-danger' : ''}" @click=${(e: Event) => this.openContextInspector(e)}>
               <div class="context-bar-fill ${this.getContextPercentage() > 0.8 ? 'ctx-warn' : ''}" style="width:${Math.min(100, this.getContextPercentage() * 100)}%"></div>
               <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.getContextTokens().toLocaleString()} / ${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</span>
               ${this.getContextPercentage() > 0.85 ? html`<span class="ctx-compact-hint" @click=${(e: Event) => { e.stopPropagation(); if (this.chatPanel?.agentInterface) { const editor = this.chatPanel.querySelector("message-editor"); const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea"); if (ta) { (ta as HTMLTextAreaElement).value = "/compact "; ta.focus(); } } }}>Compact</span>` : ""}
@@ -2070,17 +2163,24 @@ export class SessionChat extends LitElement {
               `)}
             </div>
             ${this.streamStatus !== "idle" ? html`
-              <div class="stream-status-pill stream-${this.streamStatus}" aria-live="polite">
+              <div class="inline-stream-status stream-${this.streamStatus}" aria-live="polite">
                 <span class="stream-dot"></span>
                 <span>${this.streamLabel || (this.streamStatus === "thinking" ? "Thinking" : this.streamStatus === "tool" ? "Running tool" : "Streaming")}</span>
               </div>
             ` : ""}
             ${this.chatPanel}
           </div>
+          ${this.renderInspector()}
         </div>
 
-
-      </div>
+        <div class="bottom-panel ${this.showGitDiff || this.showCommitPanel || this.showTerminal ? 'active' : ''}">
+          <div class="bottom-panel-tabs">
+            <button class="bottom-tab ${this.showTerminal ? 'active' : ''}" @click=${() => { this.showTerminal = true; this.requestUpdate(); }}>Terminal</button>
+            <button class="bottom-tab ${this.showGitDiff ? 'active' : ''}" @click=${this.toggleGitDiff}>Git</button>
+            <button class="bottom-tab ${this.showCommitPanel ? 'active' : ''}" @click=${this.toggleCommitPanel}>Commit</button>
+            <span class="bottom-panel-meta">${this.terminalRunning ? "running" : "idle"} · ${this.terminalCwd}</span>
+            <button class="bottom-panel-close" @click=${() => { this.showTerminal = false; this.showGitDiff = false; this.showCommitPanel = false; this.requestUpdate(); }} aria-label="Close bottom panel">×</button>
+          </div>
         ${this.showGitDiff ? html`
           <div class="git-panel">
             <div class="terminal-header">
@@ -2142,8 +2242,10 @@ export class SessionChat extends LitElement {
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Terminal
                 ${this.terminalRunning ? html`<span class="terminal-running-dot"></span>` : ""}
                 <span class="terminal-cwd">${this.terminalCwd}</span>
+                <span class="terminal-limit">one-shot shell · no PTY</span>
               </span>
               <button class="terminal-action-btn" @click=${() => { this.terminalContent = ""; this.requestUpdate(); }}>Clear</button>
+              <button class="terminal-action-btn" @click=${() => { if (navigator.clipboard) navigator.clipboard.writeText(this.terminalContent || "").catch(() => {}); }}>Copy output</button>
               <button class="close-btn" @click=${this.toggleTerminal}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -2179,6 +2281,7 @@ export class SessionChat extends LitElement {
             </div>
           </div>
         ` : ""}
+        </div>
 
         ${this.contextMenuVisible && this.contextMenuNode ? html`
           <div class="context-menu" style="left:${this.contextMenuX}px;top:${this.contextMenuY}px">
@@ -2192,6 +2295,7 @@ export class SessionChat extends LitElement {
             </div>
           </div>
         ` : ""}
+      </div>
     `;
   }
 }
