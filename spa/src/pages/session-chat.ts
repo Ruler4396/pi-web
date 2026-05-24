@@ -345,7 +345,7 @@ export class SessionChat extends LitElement {
     const taRect = ta.getBoundingClientRect();
     const editorRect = editor?.getBoundingClientRect();
     const anchorRect = editorRect && editorRect.width > 0 ? editorRect : taRect;
-    const gap = 6;
+    const gap = 8;
     const viewportPadding = 12;
     const width = Math.min(anchorRect.width, 760, window.innerWidth - viewportPadding * 2);
     const availableHeight = Math.max(80, anchorRect.top - viewportPadding - gap);
@@ -358,7 +358,7 @@ export class SessionChat extends LitElement {
       viewportPadding,
       Math.min(window.innerWidth - width - viewportPadding, anchorRect.left + anchorRect.width / 2 - width / 2),
     );
-    const bottom = Math.max(viewportPadding, window.innerHeight - anchorRect.top + gap);
+    const bottom = Math.max(viewportPadding, window.innerHeight - taRect.top + gap);
 
     dropdown.style.top = "auto";
     dropdown.style.left = `${left}px`;
