@@ -152,9 +152,12 @@ export class SessionChat extends LitElement {
   @state() private activeTab = 0;
   @state() tabPanelWidth = 42;
   @state() private _slashFilterText = "";
+  @state() private streamStatus: "idle" | "thinking" | "receiving" | "tool" = "idle";
+  @state() private streamLabel = "";
   private chatPanel?: ChatPanel;
   private agent?: HttpAgent;
   private msgInterval = 0;
+  private _streamClearTimer = 0;
 
   // Drag-drop tracking for file tree
   private dragCounter = 0;
@@ -261,6 +264,7 @@ export class SessionChat extends LitElement {
     if (this._globalClick) document.removeEventListener("click", this._globalClick);
     clearInterval(this.msgInterval);
     clearInterval(this._gitInterval);
+    clearTimeout(this._streamClearTimer);
     this._msgObserver?.disconnect();
     this.chatPanel?.remove();
     this.chatPanel = undefined;
@@ -327,32 +331,102 @@ export class SessionChat extends LitElement {
     return (editor as any).shadowRoot?.querySelector("textarea") || editor.querySelector("textarea");
   }
 
+  private _findEditorElement(): HTMLElement | null {
+    const cp = this.chatPanel;
+    if (!cp) return null;
+    return ((cp as any).querySelector("message-editor") || this.querySelector("message-editor")) as HTMLElement | null;
+  }
+
   private _positionFloatingPicker(selector: string) {
     const dropdown = this.querySelector(selector) as HTMLElement | null;
     const ta = this._findTextarea();
+    const editor = this._findEditorElement();
     if (!dropdown || !ta) return;
     const taRect = ta.getBoundingClientRect();
-    const gap = 8;
+    const editorRect = editor?.getBoundingClientRect();
+    const anchorRect = editorRect && editorRect.width > 0 ? editorRect : taRect;
+    const gap = 6;
     const viewportPadding = 12;
-    const width = Math.min(taRect.width, 720);
-    const availableHeight = Math.max(80, taRect.top - viewportPadding - gap);
+    const width = Math.min(anchorRect.width, 760, window.innerWidth - viewportPadding * 2);
+    const availableHeight = Math.max(80, anchorRect.top - viewportPadding - gap);
     const maxHeight = Math.min(440, availableHeight);
 
     dropdown.style.position = "fixed";
     dropdown.style.width = `${width}px`;
     dropdown.style.maxHeight = `${maxHeight}px`;
-
-    const measuredHeight = Math.min(dropdown.offsetHeight, maxHeight);
     const left = Math.max(
       viewportPadding,
-      Math.min(window.innerWidth - width - viewportPadding, taRect.left + taRect.width / 2 - width / 2),
+      Math.min(window.innerWidth - width - viewportPadding, anchorRect.left + anchorRect.width / 2 - width / 2),
     );
-    const top = Math.max(viewportPadding, taRect.top - measuredHeight - gap);
+    const bottom = Math.max(viewportPadding, window.innerHeight - anchorRect.top + gap);
 
-    dropdown.style.top = `${top}px`;
+    dropdown.style.top = "auto";
     dropdown.style.left = `${left}px`;
-    dropdown.style.bottom = "auto";
+    dropdown.style.bottom = `${bottom}px`;
     dropdown.style.transform = "none";
+  }
+
+  private _setTextareaValue(ta: HTMLTextAreaElement, value: string) {
+    ta.value = value;
+    ta.selectionStart = value.length;
+    ta.selectionEnd = value.length;
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    ta.focus();
+  }
+
+  private _setStreamStatus(status: "idle" | "thinking" | "receiving" | "tool", label = "") {
+    clearTimeout(this._streamClearTimer);
+    this.streamStatus = status;
+    this.streamLabel = label;
+    if (status === "idle") {
+      this.streamLabel = "";
+    }
+    this.requestUpdate();
+  }
+
+  private _settleStreamStatus(label = "Done") {
+    clearTimeout(this._streamClearTimer);
+    this.streamStatus = "receiving";
+    this.streamLabel = label;
+    this.requestUpdate();
+    this._streamClearTimer = window.setTimeout(() => {
+      this.streamStatus = "idle";
+      this.streamLabel = "";
+      this.requestUpdate();
+    }, 1200);
+  }
+
+  private _messageScrollEl(): HTMLElement | null {
+    const cp = this.chatPanel as any;
+    if (!cp) return null;
+    const selectors = [
+      "message-list",
+      "streaming-message-container",
+      "agent-interface",
+      "[data-scroll-container]",
+      ".overflow-y-auto",
+      ".overflow-auto",
+    ];
+    for (const selector of selectors) {
+      const el = cp.querySelector?.(selector) as HTMLElement | null;
+      if (el && el.scrollHeight > el.clientHeight) return el;
+    }
+    if (cp.scrollHeight > cp.clientHeight) return cp as HTMLElement;
+    return null;
+  }
+
+  private _nearMessageBottom(el: HTMLElement): boolean {
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+  }
+
+  private _scrollMessagesToBottom(force = false) {
+    requestAnimationFrame(() => {
+      const el = this._messageScrollEl();
+      if (!el) return;
+      if (force || this._nearMessageBottom(el)) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
   }
 
   private get _displayCommands() {
@@ -454,6 +528,26 @@ export class SessionChat extends LitElement {
     this.agent = new HttpAgent(this.sessionId);
     this.agent.setCwd(this.sessionCwd);
     this.agent.subscribe((event: any) => {
+      if (event.type === "agent_start") {
+        this._setStreamStatus("thinking", "Thinking");
+        this._scrollMessagesToBottom(true);
+      }
+      if (event.type === "message_start") {
+        this._setStreamStatus("receiving", "Streaming");
+        this._scrollMessagesToBottom(true);
+      }
+      if (event.type === "message_update") {
+        this._setStreamStatus("receiving", "Streaming");
+        this._scrollMessagesToBottom(false);
+      }
+      if (event.type === "message_end") {
+        this._settleStreamStatus("Response complete");
+        this._scrollMessagesToBottom(true);
+      }
+      if (event.type === "error") {
+        this._settleStreamStatus("Stopped with error");
+        this._scrollMessagesToBottom(true);
+      }
       if (event.type === "goal_start") {
         this.goalStatus = {
           running: true,
@@ -489,6 +583,8 @@ export class SessionChat extends LitElement {
         const lastMsg = event.messages[event.messages.length - 1];
         const text = lastMsg?.content?.map?.((c: any) => c.text || "").join("")?.slice(0, 100) || "";
         notify("Pi Agent", text || "Task completed");
+        this._settleStreamStatus("Task complete");
+        this._scrollMessagesToBottom(true);
       }
       if (event.type === "tool_execution_end") {
         const tn = (event.toolName || "").toLowerCase();
@@ -499,17 +595,20 @@ export class SessionChat extends LitElement {
           }, 300);
         }
         this.runningTools = this.runningTools.filter(t => t !== event.toolName);
+        this._setStreamStatus(this.runningTools.length > 0 ? "tool" : "receiving", this.runningTools.length > 0 ? this.runningTools[0] : "Streaming");
         this.requestUpdate();
       }
       if (event.type === "tool_execution_start") {
         const tn = event.toolName || "";
         if (!this.runningTools.includes(tn)) {
           this.runningTools = [...this.runningTools, tn];
+          this._setStreamStatus("tool", tn);
           this.requestUpdate();
         }
       }
       if (event.type === "auto_compaction_start") {
         this.compactionStatus = { running: true, reason: event.reason || "manual" };
+        this._setStreamStatus("tool", "Compacting context");
         this.requestUpdate();
       }
       if (event.type === "auto_compaction_end") {
@@ -517,6 +616,7 @@ export class SessionChat extends LitElement {
           running: false,
           errorMessage: event.errorMessage || "",
         };
+        this._settleStreamStatus(event.errorMessage ? "Compaction stopped" : "Context compacted");
         this.requestUpdate();
       }
       if (event.type === "subagent_plan_start") {
@@ -525,6 +625,7 @@ export class SessionChat extends LitElement {
           objective: event.objective || "",
           requestedAgents: event.requestedAgents || 0,
         };
+        this._setStreamStatus("thinking", "Planning agents");
         this.requestUpdate();
       }
       if (event.type === "subagent_plan_ready") {
@@ -537,6 +638,8 @@ export class SessionChat extends LitElement {
           mode: plan.mode || "",
         };
         this.showToast("info", "Sub-agent plan ready");
+        this._settleStreamStatus("Plan ready");
+        this._scrollMessagesToBottom(true);
         this.requestUpdate();
       }
     });
@@ -628,8 +731,15 @@ export class SessionChat extends LitElement {
       else if (e.key === "Enter" && this.showSlashCommands) {
         e.preventDefault();
         const cmd = cmds[this.slashIdx];
-        if (cmd) { ta.value = cmd.cmd + " "; this.showSlashCommands = false; this._slashFilterText = ""; this.requestUpdate(); }
+        if (cmd) { this._setTextareaValue(ta, cmd.cmd + " "); this.showSlashCommands = false; this._slashFilterText = ""; this.requestUpdate(); }
       }
+      else if (e.key === "Tab" && this.showSlashCommands) {
+        e.preventDefault();
+        const cmd = cmds[this.slashIdx];
+        if (cmd) { this._setTextareaValue(ta, cmd.cmd + " "); this.showSlashCommands = false; this._slashFilterText = ""; this.requestUpdate(); }
+      }
+      else if (e.key === "Home") { e.preventDefault(); this.slashIdx = 0; this.requestUpdate(); }
+      else if (e.key === "End") { e.preventDefault(); this.slashIdx = cmds.length - 1; this.requestUpdate(); }
       else if (e.key === "Escape") { this.showSlashCommands = false; this._slashFilterText = ""; this.requestUpdate(); }
     };
     document.addEventListener("input", this._slashInput);
@@ -1863,7 +1973,7 @@ export class SessionChat extends LitElement {
                 return html`
                   <div class="slash-item${item._idx === this.slashIdx ? ' selected' : ''}" @click=${() => {
                     const ta = this._findTextarea();
-                    if (ta) { ta.value = c.cmd + " "; ta.focus(); }
+                    if (ta) this._setTextareaValue(ta, c.cmd + " ");
                     this.showSlashCommands = false; this._slashFilterText = "";
                     this.requestUpdate();
                   }}>
@@ -1888,6 +1998,12 @@ export class SessionChat extends LitElement {
                 </div>
               `)}
             </div>
+            ${this.streamStatus !== "idle" ? html`
+              <div class="stream-status-pill stream-${this.streamStatus}" aria-live="polite">
+                <span class="stream-dot"></span>
+                <span>${this.streamLabel || (this.streamStatus === "thinking" ? "Thinking" : this.streamStatus === "tool" ? "Running tool" : "Streaming")}</span>
+              </div>
+            ` : ""}
             ${this.chatPanel}
           </div>
         </div>

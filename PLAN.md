@@ -1,7 +1,7 @@
 # Pi Agent Web Server — 实施计划
 
 > **终极目标**: 将 opencode 完整生态迁移到 pi_rust 中。
-> **当前阶段**: Phase 22 — 模型选择器重构
+> **当前阶段**: Phase 27 — 真实子代理执行器
 
 ## 架构
 
@@ -10,7 +10,7 @@
 - **部署**: 8.138.1.39，nginx 反向代理 4443 端口 SSL
 - **CI**: GitHub Actions（构建+E2E+健康检查），每分钟 cron 自动部署
 
-## 已完成 (Phase 14-21)
+## 已完成 (Phase 14-26)
 
 ### 14. 侧边栏 + 文件操作
 后端文件 API (list/read/download/write/delete, 深度4)，前端 file-tree（SVG图标+懒加载）、file-upload（拖拽上传到指定目录）、右键菜单（下载/删除），三栏布局可拖拽宽度。
@@ -36,16 +36,36 @@ Light-DOM组件样式迁移全局CSS，暗色编辑器卡片，预览滚动条(o
 ### 21. CI体系
 Playwright E2E(7测试)，tsc --noEmit类型检查，每日健康检查，Rust编译缓存，tag触发部署。
 
-## Phase 22（进行中）：模型选择器
+### 22. 模型选择器
 
-- 顶栏模型选择器：先选厂商(DeepSeek/Anthropic)再选模型
-- 替换ChatPanel内置的ugly选择器
-- 发送按钮SVG优化
+顶栏模型选择器、思考等级选择器、最近模型、隐藏 ChatPanel 内置模型按钮，发送区按钮视觉统一。
 
-## Phase 23（计划）：消息流验证 + 终端持久化
+### 23. Hermes 通知 + 文件引用
 
-- DeepSeek API恢复额度后验证SSE消息流渲染
-- 终端cwd持久化到localStorage
+任务完成后通过 Hermes MCP 调用 `send_wecom_notification` 发送企业微信通知；输入框支持 `@当前目录下文件`，发送前扩展为文件上下文。
+
+### 24. 目标生命周期
+
+`/goal` 接入后端长期目标事件，前端展示 Goal 运行/迭代/完成/停止状态，避免用户误以为任务卡住。
+
+### 25. 上下文压缩 + 子代理规划契约
+
+`/compact` 接到真实后端压缩 RPC；`/agents` 和 `/subagents` 接到 `pi.subagent.plan.v1` 规划契约，包含上下文预算、缓存失效策略、并行上限和停止策略。当前只做安全规划，不启动真实子代理执行器。
+
+### 26. 对话区与流式体验打磨
+
+- 修复 `/` 和 `@` 浮层过滤后悬空，改为贴合输入区上沿的 bottom-anchor 定位
+- 优化命令补全键盘体验：Enter/Tab 选中、Home/End 跳转、选中项自动滚入视野
+- 优化对话区排版，贴近 ChatGPT/DeepSeek Web 的宽度、行高、代码块和用户消息气泡
+- 增加流式状态 pill：Thinking / Streaming / Running tool / complete
+- 增强滚动锚定：流式更新时仅在接近底部时跟随，开始和结束强制落底
+- 处理移动端：隐藏文件栏/标签栏，修正输入区、浮层和状态提示的遮挡
+
+## Phase 27（计划）：真实子代理执行器
+
+- 在 Phase 25 的规划契约基础上实现真实调度器
+- 为每个子代理裁剪上下文、复用缓存、隔离写入范围
+- 汇总结果并做停止条件检查，避免无限迭代和无进展 token 消耗
 
 ## API 端点
 
