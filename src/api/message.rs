@@ -63,13 +63,19 @@ pub async fn send(
         .strip_prefix("/agents ")
         .or_else(|| message.strip_prefix("/subagents "))
     {
+        RpcCommand::subagent_execute(objective.trim(), cwd, Some(3))
+    } else if let Some(objective) = message
+        .strip_prefix("/agents-plan ")
+        .or_else(|| message.strip_prefix("/subagents-plan "))
+    {
         RpcCommand::subagent_plan(objective.trim(), cwd, Some(3))
     } else {
         let mut cmd = RpcCommand::prompt(&message);
         cmd.extra = serde_json::json!({"thinkingLevel": thinking_level});
         cmd
     };
-    let one_shot_command = matches!(cmd.command_type.as_str(), "compact" | "subagent_plan");
+    let goal_command = cmd.command_type == "goal";
+    let one_shot_command = matches!(cmd.command_type.as_str(), "compact" | "subagent_plan" | "subagent_execute");
     let request_id = agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     let notify_config = state.config.clone();
     let notify_session_id = id.clone();
@@ -79,11 +85,13 @@ pub async fn send(
             match rx.recv().await {
                 Ok(event) => {
                     let json = serde_json::to_string(&event).unwrap_or_default();
-                    let completion_notice = crate::api::notify::completion_text(
-                        &notify_session_id,
-                        &notify_prompt,
-                        &event,
-                    );
+                    let completion_notice = goal_command.then(|| {
+                        crate::api::notify::completion_text(
+                            &notify_session_id,
+                            &notify_prompt,
+                            &event,
+                        )
+                    }).flatten();
                     let event_type = match &event {
                         crate::pi::protocol::AgentEvent::AgentStart { .. } => "agent_start",
                         crate::pi::protocol::AgentEvent::AgentEnd { .. } => "agent_end",
@@ -105,6 +113,10 @@ pub async fn send(
                         crate::pi::protocol::AgentEvent::AutoCompactionEnd { .. } => "auto_compaction_end",
                         crate::pi::protocol::AgentEvent::SubAgentPlanStart { .. } => "subagent_plan_start",
                         crate::pi::protocol::AgentEvent::SubAgentPlanReady { .. } => "subagent_plan_ready",
+                        crate::pi::protocol::AgentEvent::SubAgentExecutionStart { .. } => "subagent_execution_start",
+                        crate::pi::protocol::AgentEvent::SubAgentTaskStart { .. } => "subagent_task_start",
+                        crate::pi::protocol::AgentEvent::SubAgentTaskEnd { .. } => "subagent_task_end",
+                        crate::pi::protocol::AgentEvent::SubAgentExecutionEnd { .. } => "subagent_execution_end",
                         crate::pi::protocol::AgentEvent::AutoRetryStart { .. } => "auto_retry_start",
                         crate::pi::protocol::AgentEvent::AutoRetryEnd { .. } => "auto_retry_end",
                         crate::pi::protocol::AgentEvent::CommandResponse { .. } => "response",
@@ -116,7 +128,7 @@ pub async fn send(
                         break;
                     }
 
-                    if matches!(event, crate::pi::protocol::AgentEvent::AgentEnd { .. }) {
+                    if !one_shot_command && matches!(event, crate::pi::protocol::AgentEvent::AgentEnd { .. }) {
                         if let Some(message) = completion_notice {
                             let config = notify_config.clone();
                             tokio::spawn(async move {

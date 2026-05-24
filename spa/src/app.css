@@ -335,22 +335,25 @@ session-list .btn-confirm:hover { background: #1d4ed8; }
 .resize-handle:hover, .resize-handle.active { background: rgba(37,99,235,0.3); }
 
 /* ===== Terminal ===== */
-.terminal-panel { height: 220px; flex-shrink: 0; display: flex; flex-direction: column; background: #1a1a1a; color: #e0e0e0; border-top: 1px solid #333; }
-.terminal-header { display: flex; align-items: center; justify-content: space-between; padding: 4px 10px; background: #252525; flex-shrink: 0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
-.terminal-title { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #999; font-weight: 500; }
+.terminal-panel { height: 248px; flex-shrink: 0; display: flex; flex-direction: column; background: #181818; color: #d4d4d4; border-top: 1px solid #2b2b2b; box-shadow: 0 -1px 0 rgba(255,255,255,0.03); }
+.terminal-header { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 5px 10px; background: #1f1f1f; flex-shrink: 0; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+.terminal-title { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; font-size: 11px; color: #cccccc; font-weight: 500; }
 .terminal-cwd {
   max-width: 50vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  color: #666; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-weight: 400;
+  color: #8b949e; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, monospace; font-weight: 400;
 }
 .terminal-header .close-btn { width: 20px; height: 20px; border: none; background: none; cursor: pointer; color: #666; border-radius: 3px; display: flex; align-items: center; justify-content: center; padding: 0; }
 .terminal-header .close-btn:hover { background: rgba(255,255,255,0.1); color: #ccc; }
-.terminal-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+.terminal-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .terminal-output-wrap { flex: 1; overflow-y: auto; min-height: 0; }
-.terminal-input-wrap { display: flex; align-items: center; border-top: 1px solid #333; padding: 0; flex-shrink: 0; }
-.terminal-prompt { color: #0f0; padding: 6px 8px; font-size: 13px; user-select: none; font-family: inherit; }
-.terminal-input { flex: 1; padding: 6px 4px; border: none; background: transparent; color: #e0e0e0; font-size: 13px; font-family: inherit; outline: none; resize: none; }
+.terminal-input-wrap { display: flex; align-items: center; border-top: 1px solid #2b2b2b; padding: 0; flex-shrink: 0; background: #151515; }
+.terminal-prompt { color: #4fc1ff; padding: 7px 8px; font-size: 12px; user-select: none; font-family: inherit; }
+.terminal-input { flex: 1; padding: 7px 4px; border: none; background: transparent; color: #d4d4d4; font-size: 12px; font-family: inherit; outline: none; resize: none; }
+.terminal-input:focus { box-shadow: inset 0 -1px 0 #007acc; }
+.terminal-input:disabled { opacity: 0.62; cursor: progress; }
 .terminal-input::placeholder { color: #555; }
-.terminal-output { margin: 0; padding: 6px 10px; font-size: 13px; white-space: pre-wrap; overflow-y: auto; color: #ccc; background: transparent; font-family: inherit; }
+.terminal-output { margin: 0; padding: 8px 10px; font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-y: auto; color: #d4d4d4; background: transparent; font-family: inherit; }
+.terminal-running-dot { width: 6px; height: 6px; border-radius: 999px; background: #22c55e; box-shadow: 0 0 0 3px rgba(34,197,94,0.16); }
 
 /* ===== Syntax highlighting ===== */
 .hl-kw { color: #8250df; }
@@ -814,9 +817,7 @@ user-message {
   display: flex !important;
   justify-content: flex-end !important;
 }
-user-message .message-body,
-user-message markdown-block,
-user-message p {
+user-message .message-body {
   width: fit-content !important;
   max-width: min(78%, 42rem) !important;
   margin-left: auto !important;
@@ -825,6 +826,18 @@ user-message p {
   background: rgba(37,99,235,0.08) !important;
   color: var(--text-strong) !important;
   box-shadow: inset 0 0 0 1px rgba(37,99,235,0.08) !important;
+}
+user-message markdown-block,
+user-message p {
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  writing-mode: horizontal-tb !important;
+  overflow-wrap: anywhere !important;
 }
 assistant-message {
   color: var(--text-base) !important;
@@ -903,9 +916,7 @@ message-list .message-body, streaming-message-container .message-body {
 [data-theme="dark"] message-list p code, [data-theme="dark"] streaming-message-container p code {
   background: #2a2a2a !important;
 }
-[data-theme="dark"] user-message .message-body,
-[data-theme="dark"] user-message markdown-block,
-[data-theme="dark"] user-message p {
+[data-theme="dark"] user-message .message-body {
   background: rgba(37,99,235,0.16) !important;
   box-shadow: inset 0 0 0 1px rgba(96,165,250,0.12) !important;
 }
@@ -955,14 +966,14 @@ message-list .message-body, streaming-message-container .message-body {
 }
 
 /* Context detail popup */
-.context-bar { cursor: pointer; }
+.context-bar { cursor: pointer; z-index: 60; overflow: visible; }
 .context-bar:hover .context-bar-text { color: var(--text-base); }
 .context-bar-fill.ctx-warn { background: linear-gradient(90deg, rgba(239,68,68,0.08), rgba(239,68,68,0.2)) !important; border-right-color: rgba(239,68,68,0.3) !important; }
 .context-detail {
   position: absolute; right: 0; top: 100%; margin-top: 4px;
   background: var(--surface-raised); border-radius: 8px;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.1);
-  z-index: 45; min-width: 180px; padding: 4px 0;
+  z-index: 1003; min-width: 190px; padding: 4px 0; pointer-events: auto;
 }
 .ctx-detail-row {
   display: flex; justify-content: space-between; align-items: center;
@@ -1193,9 +1204,7 @@ assistant-message:hover .msg-regen-btn {
     width: 100% !important;
     margin: 14px auto !important;
   }
-  user-message .message-body,
-  user-message markdown-block,
-  user-message p {
+  user-message .message-body {
     max-width: 86% !important;
   }
   .slash-dropdown,

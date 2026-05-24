@@ -3,7 +3,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { unsafeHTML } from "lit/directives/unsafe-html.js";
 import { ChatPanel } from "@earendil-works/pi-web-ui";
 import { HttpAgent } from "../http-agent";
-import { notify, getNotifySettings, setNotifySettings, requestBrowserPermission } from "../notifications";
+import { getNotifySettings, setNotifySettings, requestBrowserPermission } from "../notifications";
 import { renderDiff } from "../diff";
 import { setupToolRenderers } from "../tool-renderers";
 
@@ -56,7 +56,7 @@ export class SessionChat extends LitElement {
   @state() private theme: "dark" | "" = "dark";
   @state() private sessionCwd = "/root";
   @state() private hasMessages = false;
-    @state() showTerminal = false;
+  @state() showTerminal = false;
   @state() showModelDropdown = false;
   @state() modelProvider = "deepseek"; @state() modelId = "deepseek-v4-flash"; @state() modelLabel = "DeepSeek V4 Flash";
   @state() thinkingLevel = "off";
@@ -94,8 +94,9 @@ export class SessionChat extends LitElement {
     { cmd: "/init", desc: "初始化项目分析", action: "ai" },
     { cmd: "/plan", desc: "制定实施计划", action: "ai" },
     { cmd: "/goal", desc: "设定长期目标，自主迭代执行", action: "ai" },
-    { cmd: "/agents", desc: "生成子代理并行计划", action: "ai" },
-    { cmd: "/subagents", desc: "生成子代理并行计划", action: "ai" },
+    { cmd: "/agents", desc: "规划并执行真实子代理任务", action: "ai" },
+    { cmd: "/agents-plan", desc: "只生成子代理计划", action: "ai" },
+    { cmd: "/subagents", desc: "规划并执行真实子代理任务", action: "ai" },
     { cmd: "/fork", desc: "分支对话", action: "ai" },
     { cmd: "/compact", desc: "压缩上下文", action: "ai" },
     { cmd: "/btw", desc: "临时提问，不污染对话", action: "ai" },
@@ -148,6 +149,9 @@ export class SessionChat extends LitElement {
   @state() addModelForm = { provider: "", id: "", label: "", apiKey: "", baseUrl: "", thinking: false };
   @state() private terminalContent = "";
   @state() private terminalCwd = "/root";
+  @state() private terminalRunning = false;
+  private terminalHistory: string[] = [];
+  private terminalHistoryIndex = -1;
   @state() private tabs: FileTab[] = [];
   @state() private activeTab = 0;
   @state() tabPanelWidth = 42;
@@ -238,7 +242,11 @@ export class SessionChat extends LitElement {
       this.contextMenuVisible = true;
       this.requestUpdate();
     }) as EventListener);
-    this._globalClick = (_e: Event) => {
+    this._globalClick = (e: Event) => {
+      const target = e.target as Element | null;
+      if (target?.closest?.(".context-bar, .context-detail")) {
+        return;
+      }
       if (this.contextMenuVisible) { this.contextMenuVisible = false; this.requestUpdate(); }
       if (this.showSessionSwitcher || this.showModelDropdown || this.showThinkingDropdown || this.showContextDetail) {
         this.closeFloatingPanels();
@@ -580,9 +588,6 @@ export class SessionChat extends LitElement {
         this.requestUpdate();
       }
       if (event.type === "agent_end" && event.messages?.length) {
-        const lastMsg = event.messages[event.messages.length - 1];
-        const text = lastMsg?.content?.map?.((c: any) => c.text || "").join("")?.slice(0, 100) || "";
-        notify("Pi Agent", text || "Task completed");
         this._settleStreamStatus("Task complete");
         this._scrollMessagesToBottom(true);
       }
@@ -639,6 +644,35 @@ export class SessionChat extends LitElement {
         };
         this.showToast("info", "Sub-agent plan ready");
         this._settleStreamStatus("Plan ready");
+        this._scrollMessagesToBottom(true);
+        this.requestUpdate();
+      }
+      if (event.type === "subagent_execution_start") {
+        this.subAgentPlanStatus = {
+          running: true,
+          objective: event.objective || "",
+          requestedAgents: event.taskCount || 0,
+          taskCount: event.taskCount || 0,
+          mode: "executing",
+        };
+        this._setStreamStatus("thinking", "Sub-agents running");
+        this.requestUpdate();
+      }
+      if (event.type === "subagent_task_start") {
+        this._setStreamStatus("tool", `Sub-agent: ${event.title || event.taskId || "task"}`);
+        this.requestUpdate();
+      }
+      if (event.type === "subagent_task_end") {
+        this._setStreamStatus("receiving", event.success ? "Sub-agent reported" : "Sub-agent failed");
+        this.requestUpdate();
+      }
+      if (event.type === "subagent_execution_end") {
+        this.subAgentPlanStatus = {
+          ...(this.subAgentPlanStatus || { running: false }),
+          running: false,
+          mode: event.completed ? "completed" : "stopped",
+        };
+        this._settleStreamStatus(event.completed ? "Sub-agents complete" : "Sub-agents stopped");
         this._scrollMessagesToBottom(true);
         this.requestUpdate();
       }
@@ -1500,46 +1534,83 @@ export class SessionChat extends LitElement {
       try { await ft.loadDir(this.sessionCwd); } catch(e) {}
     }
   }
+  private scrollTerminalToBottom() {
+    this.updateComplete.then(() => {
+      const wrap = this.renderRoot.querySelector(".terminal-output-wrap") as HTMLElement | null;
+      if (wrap) wrap.scrollTop = wrap.scrollHeight;
+    });
+  }
+
+  private shellQuote(value: string): string {
+    return "'" + value.replace(/'/g, "'\\''") + "'";
+  }
+
   async runTerminalCommand(cmd: string, input: HTMLTextAreaElement) {
-    this.terminalContent += this.terminalCwd + " $ " + cmd + "\n";
+    if (this.terminalRunning) return;
+    const trimmed = cmd.trim();
+    this.terminalHistory = [trimmed, ...this.terminalHistory.filter(item => item !== trimmed)].slice(0, 80);
+    this.terminalHistoryIndex = -1;
+    this.terminalContent += this.terminalCwd + " $ " + trimmed + "\n";
     input.value = "";
+    this.terminalRunning = true;
     this.requestUpdate();
-    // Handle cd locally
-    const cdMatch = cmd.trim().match(/^cd\s+(.+)$/);
-    if (cdMatch) {
-      const target = cdMatch[1].trim();
-      let newCwd = target.startsWith("/") ? target : this.terminalCwd.replace(/\/+$/, "") + "/" + target;
-      // Normalize path
-      const parts = newCwd.split("/").filter(function(p) { return p && p !== "."; });
-      const resolved = [];
-      for (var i = 0; i < parts.length; i++) {
-        if (parts[i] === "..") { if (resolved.length > 0) resolved.pop(); }
-        else { resolved.push(parts[i]); }
-      }
-      newCwd = "/" + resolved.join("/");
-      this.terminalCwd = newCwd || "/";
-      this.terminalContent += "(changed to " + this.terminalCwd + ")\n";
+    this.scrollTerminalToBottom();
+
+    if (trimmed === "clear" || trimmed === "cls") {
+      this.terminalContent = "";
+      this.terminalRunning = false;
       this.requestUpdate();
       return;
     }
+
+    const cdMatch = trimmed.match(/^cd(?:\s+(.+))?$/);
+    if (cdMatch) {
+      const target = (cdMatch[1] || "~").trim();
+      try {
+        const res = await fetch("/api/shell/exec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ command: `cd ${this.shellQuote(target)} && pwd`, cwd: this.terminalCwd }),
+        });
+        const data = await res.json();
+        if (res.ok && data.exitCode === 0 && data.stdout?.trim()) {
+          this.terminalCwd = data.stdout.trim().split("\n").pop() || this.terminalCwd;
+          this.terminalContent += "(cwd: " + this.terminalCwd + ")\n";
+        } else {
+          this.terminalContent += (data.stderr || "cd failed") + "\n";
+        }
+      } catch(e: any) {
+        this.terminalContent += "(error: " + e.message + ")\n";
+      } finally {
+        this.terminalRunning = false;
+        this.requestUpdate();
+        this.scrollTerminalToBottom();
+      }
+      return;
+    }
+
     try {
       const res = await fetch("/api/shell/exec", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ command: cmd, cwd: this.terminalCwd }),
+        body: JSON.stringify({ command: trimmed, cwd: this.terminalCwd }),
       });
       if (res.ok) {
         const data = await res.json();
         if (data.stdout) this.terminalContent += data.stdout;
         if (data.stderr) this.terminalContent += data.stderr;
+        if (typeof data.exitCode === "number" && data.exitCode !== 0) this.terminalContent += `(exit ${data.exitCode})\n`;
         if (!data.stdout && !data.stderr) this.terminalContent += "(no output)\n";
       } else {
         this.terminalContent += "(command failed)\n";
       }
     } catch(e: any) {
       this.terminalContent += "(error: " + e.message + ")\n";
+    } finally {
+      this.terminalRunning = false;
+      this.requestUpdate();
+      this.scrollTerminalToBottom();
     }
-    this.requestUpdate();
   }
 
   private addLineNumbers(html: string): string {
@@ -1949,12 +2020,12 @@ export class SessionChat extends LitElement {
                 </div>
               </div>
             ` : ""}
-            <div class="context-bar ${this.getContextPercentage() > 0.8 ? 'ctx-crit' : ''} ${this.getContextPercentage() > 0.95 ? 'ctx-danger' : ''}" @click=${() => { const next = !this.showContextDetail; this.closeFloatingPanels("context"); this.showContextDetail = next; this.requestUpdate(); }}>
+            <div class="context-bar ${this.getContextPercentage() > 0.8 ? 'ctx-crit' : ''} ${this.getContextPercentage() > 0.95 ? 'ctx-danger' : ''}" @click=${(e: Event) => { e.stopPropagation(); const next = !this.showContextDetail; this.closeFloatingPanels("context"); this.showContextDetail = next; this.requestUpdate(); }}>
               <div class="context-bar-fill ${this.getContextPercentage() > 0.8 ? 'ctx-warn' : ''}" style="width:${Math.min(100, this.getContextPercentage() * 100)}%"></div>
               <span class="context-bar-text"><span class="ctx-label">上下文</span> ${this.getContextTokens().toLocaleString()} / ${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</span>
               ${this.getContextPercentage() > 0.85 ? html`<span class="ctx-compact-hint" @click=${(e: Event) => { e.stopPropagation(); if (this.chatPanel?.agentInterface) { const editor = this.chatPanel.querySelector("message-editor"); const ta = (editor as any)?.shadowRoot?.querySelector("textarea") || editor?.querySelector("textarea"); if (ta) { (ta as HTMLTextAreaElement).value = "/compact "; ta.focus(); } } }}>Compact</span>` : ""}
               ${this.showContextDetail ? html`
-                <div class="context-detail">
+                <div class="context-detail" @click=${(e: Event) => e.stopPropagation()}>
                   <div class="ctx-detail-row"><span>已用 token</span><span>${this.getContextTokens().toLocaleString()}</span></div>
                   <div class="ctx-detail-row"><span>总量限制</span><span>${this.contextMax >= 1000000 ? (this.contextMax/1048576).toFixed(0) + "M" : (this.contextMax/1000).toFixed(0) + "k"}</span></div>
                   <div class="ctx-detail-row"><span>使用率</span><span>${(this.getContextPercentage() * 100).toFixed(1)}%</span></div>
@@ -2069,8 +2140,10 @@ export class SessionChat extends LitElement {
             <div class="terminal-header">
               <span class="terminal-title">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Terminal
+                ${this.terminalRunning ? html`<span class="terminal-running-dot"></span>` : ""}
                 <span class="terminal-cwd">${this.terminalCwd}</span>
               </span>
+              <button class="terminal-action-btn" @click=${() => { this.terminalContent = ""; this.requestUpdate(); }}>Clear</button>
               <button class="close-btn" @click=${this.toggleTerminal}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -2079,13 +2152,27 @@ export class SessionChat extends LitElement {
               <div class="terminal-output-wrap"><pre class="terminal-output">${this.terminalContent}</pre></div>
               <div class="terminal-input-wrap">
                 <span class="terminal-prompt">$</span>
-                <textarea class="terminal-input" placeholder="type a command..." rows="1"
+                <textarea class="terminal-input" placeholder=${this.terminalRunning ? "running..." : "type a command..."} rows="1" ?disabled=${this.terminalRunning}
                   @keydown=${(e: KeyboardEvent) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       const el = e.target as HTMLTextAreaElement;
                       const cmd = el.value.trim();
                       if (cmd) this.runTerminalCommand(cmd, el);
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      if (this.terminalHistory.length) {
+                        this.terminalHistoryIndex = Math.min(this.terminalHistoryIndex + 1, this.terminalHistory.length - 1);
+                        (e.target as HTMLTextAreaElement).value = this.terminalHistory[this.terminalHistoryIndex] || "";
+                      }
+                    } else if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      this.terminalHistoryIndex = Math.max(this.terminalHistoryIndex - 1, -1);
+                      (e.target as HTMLTextAreaElement).value = this.terminalHistoryIndex >= 0 ? this.terminalHistory[this.terminalHistoryIndex] : "";
+                    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "l") {
+                      e.preventDefault();
+                      this.terminalContent = "";
+                      this.requestUpdate();
                     }
                   }}></textarea>
               </div>

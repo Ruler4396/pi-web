@@ -168,6 +168,17 @@ impl RpcCommand {
         Self { command_type: "subagent_plan".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
     }
 
+    pub fn subagent_execute(objective: &str, cwd: Option<&str>, max_agents: Option<u32>) -> Self {
+        let mut extra = serde_json::json!({"objective": objective});
+        if let Some(cwd) = cwd.map(str::trim).filter(|value| !value.is_empty()) {
+            extra["cwd"] = serde_json::Value::String(cwd.into());
+        }
+        if let Some(max_agents) = max_agents {
+            extra["maxAgents"] = serde_json::Value::Number(max_agents.into());
+        }
+        Self { command_type: "subagent_execute".into(), id: Some(uuid::Uuid::new_v4().to_string()), message: None, provider: None, model_id: None, session_id: None, extra }
+    }
+
     // === Hermes commands ===
     pub fn goal(goal_text: &str, max_iterations: u32) -> Self {
         Self {
@@ -287,6 +298,37 @@ pub enum AgentEvent {
     },
     #[serde(rename = "subagent_plan_ready")]
     SubAgentPlanReady { plan: Value },
+    #[serde(rename = "subagent_execution_start")]
+    SubAgentExecutionStart {
+        objective: String,
+        #[serde(rename = "taskCount")]
+        task_count: usize,
+        #[serde(rename = "maxParallel")]
+        max_parallel: usize,
+    },
+    #[serde(rename = "subagent_task_start")]
+    SubAgentTaskStart {
+        #[serde(rename = "taskId")]
+        task_id: String,
+        title: String,
+        #[serde(rename = "parallelSlot")]
+        parallel_slot: usize,
+    },
+    #[serde(rename = "subagent_task_end")]
+    SubAgentTaskEnd {
+        #[serde(rename = "taskId")]
+        task_id: String,
+        title: String,
+        success: bool,
+        summary: Option<String>,
+        error: Option<String>,
+    },
+    #[serde(rename = "subagent_execution_end")]
+    SubAgentExecutionEnd {
+        completed: bool,
+        results: Value,
+        summary: Option<String>,
+    },
     #[serde(rename = "auto_retry_start")]
     AutoRetryStart {
         attempt: i32,
@@ -406,6 +448,17 @@ mod tests {
         assert_eq!(plan["objective"], "audit commands");
         assert_eq!(plan["cwd"], "/root/dev/pi-web");
         assert_eq!(plan["maxAgents"], 3);
+
+        let execute = serde_json::to_value(RpcCommand::subagent_execute(
+            "fix terminal",
+            Some("/root/dev/pi-web"),
+            Some(2),
+        ))
+        .unwrap();
+        assert_eq!(execute["type"], "subagent_execute");
+        assert_eq!(execute["objective"], "fix terminal");
+        assert_eq!(execute["cwd"], "/root/dev/pi-web");
+        assert_eq!(execute["maxAgents"], 2);
     }
 
     #[test]
@@ -432,6 +485,57 @@ mod tests {
         assert!(matches!(
             ready,
             AgentEvent::SubAgentPlanReady { plan } if plan["schema"] == "pi.subagent.plan.v1"
+        ));
+    }
+
+    #[test]
+    fn parses_subagent_execution_events_from_pi_rust() {
+        let start = serde_json::from_value::<AgentEvent>(json!({
+            "type": "subagent_execution_start",
+            "objective": "fix terminal",
+            "taskCount": 2,
+            "maxParallel": 1
+        }))
+        .expect("parse subagent_execution_start");
+        assert!(matches!(
+            start,
+            AgentEvent::SubAgentExecutionStart {
+                objective,
+                task_count: 2,
+                max_parallel: 1,
+            } if objective == "fix terminal"
+        ));
+
+        let task_end = serde_json::from_value::<AgentEvent>(json!({
+            "type": "subagent_task_end",
+            "taskId": "agent-1",
+            "title": "Audit",
+            "success": true,
+            "summary": "done",
+            "error": null
+        }))
+        .expect("parse subagent_task_end");
+        assert!(matches!(
+            task_end,
+            AgentEvent::SubAgentTaskEnd {
+                task_id,
+                success: true,
+                summary: Some(summary),
+                ..
+            } if task_id == "agent-1" && summary == "done"
+        ));
+
+        let end = serde_json::from_value::<AgentEvent>(json!({
+            "type": "subagent_execution_end",
+            "completed": true,
+            "results": {"schema": "pi.subagent.execution.v1"},
+            "summary": "complete"
+        }))
+        .expect("parse subagent_execution_end");
+        assert!(matches!(
+            end,
+            AgentEvent::SubAgentExecutionEnd { completed: true, results, .. }
+                if results["schema"] == "pi.subagent.execution.v1"
         ));
     }
 }

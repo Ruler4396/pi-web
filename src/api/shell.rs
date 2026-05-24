@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::{Json, extract::State, http::StatusCode};
 use serde::Deserialize;
 
@@ -10,19 +12,27 @@ pub struct ShellRequest {
 }
 
 pub async fn exec(
-    State(state): State<AppState>,
+    State(_state): State<AppState>,
     Json(body): Json<ShellRequest>,
 ) -> Result<Json<serde_json::Value>, StatusCode> {
     let cwd = body.cwd.unwrap_or_else(|| "/root".to_string());
-    let result = tokio::task::spawn_blocking(move || {
+    let command = body.command;
+    let result = match tokio::time::timeout(Duration::from_secs(30), tokio::task::spawn_blocking(move || {
         std::process::Command::new("sh")
-            .arg("-c")
-            .arg(&body.command)
+            .arg("-lc")
+            .arg(&command)
             .current_dir(&cwd)
             .output()
-    })
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    }))
+    .await {
+        Ok(result) => result.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?,
+        Err(_) => return Ok(Json(serde_json::json!({
+            "stdout": "",
+            "stderr": "Command timed out after 30s",
+            "exitCode": -1,
+            "timedOut": true,
+        }))),
+    };
 
     match result {
         Ok(output) => Ok(Json(serde_json::json!({

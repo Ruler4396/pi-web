@@ -18,7 +18,13 @@ pub fn completion_text(session_id: &str, prompt: &str, event: &AgentEvent) -> Op
         return None;
     };
 
-    let prompt = truncate_for_notice(prompt.trim(), PROMPT_TEXT_LIMIT);
+    let trimmed_prompt = prompt.trim_start();
+    let goal = if trimmed_prompt == "/goal" {
+        ""
+    } else {
+        trimmed_prompt.strip_prefix("/goal ")?.trim_start()
+    };
+    let prompt = truncate_for_notice(goal.trim(), PROMPT_TEXT_LIMIT);
     let final_text = extract_final_text(messages)
         .map(|text| truncate_for_notice(text.trim(), FINAL_TEXT_LIMIT))
         .filter(|text| !text.is_empty())
@@ -30,9 +36,9 @@ pub fn completion_text(session_id: &str, prompt: &str, event: &AgentEvent) -> Op
         });
 
     let sid = session_id.chars().take(8).collect::<String>();
-    let mut lines = vec![format!("rustpi task finished ({sid})")];
+    let mut lines = vec![format!("rustpi goal finished ({sid})")];
     if !prompt.is_empty() {
-        lines.push(format!("Prompt: {prompt}"));
+        lines.push(format!("Goal: {prompt}"));
     }
     lines.push(format!("Result: {final_text}"));
     Some(lines.join("\n"))
@@ -146,9 +152,9 @@ mod tests {
             error: None,
         };
 
-        let text = completion_text("abcdef123456", "ship it", &event).unwrap();
+        let text = completion_text("abcdef123456", "/goal ship it", &event).unwrap();
         assert!(text.contains("abcdef12"));
-        assert!(text.contains("Prompt: ship it"));
+        assert!(text.contains("Goal: ship it"));
         assert!(text.contains("Result: done"));
     }
 
@@ -159,7 +165,20 @@ mod tests {
             error: Some("failed".to_string()),
         };
 
-        let text = completion_text("s1", "", &event).unwrap();
+        let text = completion_text("s1", "/goal", &event).unwrap();
         assert!(text.contains("Result: failed"));
+    }
+
+    #[test]
+    fn completion_text_ignores_non_goal_prompt() {
+        let event = AgentEvent::AgentEnd {
+            messages: serde_json::json!([
+                {"role": "assistant", "content": [{"text": "done"}]}
+            ]),
+            error: None,
+        };
+
+        assert!(completion_text("s1", "normal task", &event).is_none());
+        assert!(completion_text("s1", "/agents audit", &event).is_none());
     }
 }

@@ -343,6 +343,35 @@ export class HttpAgent {
                 } as any);
                 break;
               }
+              case "subagent_execution_start":
+                this._state.subAgentPlanStatus = {
+                  ...(this._state.subAgentPlanStatus || {}),
+                  running: true,
+                  objective: raw.objective || "",
+                  requestedAgents: raw.taskCount || raw.task_count || 0,
+                  taskCount: raw.taskCount || raw.task_count || 0,
+                  mode: "executing",
+                };
+                await this.emit({ type: "subagent_execution_start", ...raw } as any);
+                break;
+              case "subagent_task_start":
+                await this.emit({ type: "subagent_task_start", ...raw } as any);
+                break;
+              case "subagent_task_end":
+                await this.emit({ type: "subagent_task_end", ...raw } as any);
+                break;
+              case "subagent_execution_end": {
+                this._state.subAgentPlanStatus = {
+                  ...(this._state.subAgentPlanStatus || {}),
+                  running: false,
+                  completed: !!raw.completed,
+                };
+                const text = this.renderSubAgentExecution(raw.results || {}, raw.summary || "");
+                this._state.addMessage({ role: "assistant", content: [{ type: "text", text }] });
+                messageSent = true;
+                await this.emit({ type: "subagent_execution_end", ...raw } as any);
+                break;
+              }
               case "response":
                 if (raw.success === false) {
                   const error = raw.error || "Command failed";
@@ -350,7 +379,7 @@ export class HttpAgent {
                   this._state.addMessage({ role: "assistant", content: [{ type: "text", text: `Error: ${error}` }], stopReason: "error", errorMessage: error });
                   messageSent = true;
                   await this.emit({ type: "error", error } as any);
-                } else if (raw.data?.summary) {
+                } else if (raw.command === "compact" && raw.data?.summary) {
                   const text = `上下文已压缩。\n\n摘要：${raw.data.summary}`;
                   this._state.addMessage({ role: "assistant", content: [{ type: "text", text }] });
                   messageSent = true;
@@ -403,6 +432,25 @@ export class HttpAgent {
       "",
       `上下文策略：${plan.cachePolicy?.contextRule || plan.cache_policy?.context_rule || "bounded context"}`,
       `停止策略：${plan.stopPolicy?.completionGate || plan.stop_policy?.completion_gate || "report verification and risk"}`,
+    ];
+    return lines.filter((line, idx) => line || idx < 4).join("\n");
+  }
+
+  private renderSubAgentExecution(result: any, fallbackSummary: string): string {
+    const items = Array.isArray(result.results) ? result.results : [];
+    const lines = [
+      `子代理执行${result.completed ? "完成" : "停止"}：${result.mode || "single_agent"}`,
+      "",
+      `目标：${result.objective || ""}`,
+      "",
+      "结果：",
+      ...items.map((item: any, idx: number) => {
+        const status = item.success ? "done" : "failed";
+        const summary = item.summary || item.error || "";
+        return `${idx + 1}. ${item.title || item.taskId || "Task"} [${status}]${summary ? ` - ${summary}` : ""}`;
+      }),
+      "",
+      result.summary || fallbackSummary || "",
     ];
     return lines.filter((line, idx) => line || idx < 4).join("\n");
   }
