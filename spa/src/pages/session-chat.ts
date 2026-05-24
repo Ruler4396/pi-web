@@ -46,6 +46,7 @@ function highlightCode(code: string, _filename: string): string {
 }
 
 interface FileTab { path: string; name: string; content: string | null; error?: string; }
+interface FileMentionItem { name: string; path: string; type: "file" | "directory"; size?: number; }
 
 @customElement("session-chat")
 export class SessionChat extends LitElement {
@@ -75,6 +76,11 @@ export class SessionChat extends LitElement {
   @state() showSettings = false;
   @state() showShortcuts = false; @state() showConfig = false;
   @state() piConfig = { defaultProvider: "deepseek", defaultModel: "deepseek-v4-flash", defaultThinkingLevel: "off", theme: "dark", hideThinkingBlock: false, language: "zh", notifySound: true, notifyBrowser: false };   @state() showSlashCommands = false; @state() slashIdx = 0;
+  @state() showFileMentions = false;
+  @state() fileMentionIdx = 0;
+  @state() fileMentionQuery = "";
+  @state() fileMentionItems: FileMentionItem[] = [];
+  @state() fileMentionLoading = false;
   @state() allSessions: any[] = [];
   @state() showSessionSwitcher = false;
   slashCommands = [
@@ -253,11 +259,17 @@ export class SessionChat extends LitElement {
     const slashLayoutChanged =
       changedProperties.has("showSlashCommands") ||
       changedProperties.has("_slashFilterText") ||
-      changedProperties.has("slashIdx");
+      changedProperties.has("slashIdx") ||
+      changedProperties.has("showFileMentions") ||
+      changedProperties.has("fileMentionQuery") ||
+      changedProperties.has("fileMentionIdx") ||
+      changedProperties.has("fileMentionItems");
 
-    if (changedProperties.has("showSlashCommands")) {
-      if (!this.showSlashCommands) {
-        const d = this.querySelector(".slash-dropdown") as HTMLElement | null;
+    if (changedProperties.has("showSlashCommands") || changedProperties.has("showFileMentions")) {
+      for (const selector of [".slash-dropdown", ".file-mention-dropdown"]) {
+        const active = selector === ".slash-dropdown" ? this.showSlashCommands : this.showFileMentions;
+        if (active) continue;
+        const d = this.querySelector(selector) as HTMLElement | null;
         if (d) {
           d.style.position = "";
           d.style.top = "";
@@ -271,7 +283,7 @@ export class SessionChat extends LitElement {
     }
     if (slashLayoutChanged && this.showSlashCommands) {
       requestAnimationFrame(() => {
-        this._positionSlashDropdown();
+        this._positionFloatingPicker(".slash-dropdown");
         const sel = this.querySelector(".slash-item.selected");
         const parent = sel?.parentElement;
         if (sel && parent) {
@@ -284,6 +296,13 @@ export class SessionChat extends LitElement {
         }
       });
     }
+    if (slashLayoutChanged && this.showFileMentions) {
+      requestAnimationFrame(() => {
+        this._positionFloatingPicker(".file-mention-dropdown");
+        const sel = this.querySelector(".file-mention-item.selected");
+        sel?.scrollIntoView({ block: "nearest" });
+      });
+    }
   }
 
   private _findTextarea(): HTMLTextAreaElement | null {
@@ -294,8 +313,8 @@ export class SessionChat extends LitElement {
     return (editor as any).shadowRoot?.querySelector("textarea") || editor.querySelector("textarea");
   }
 
-  private _positionSlashDropdown() {
-    const dropdown = this.querySelector(".slash-dropdown") as HTMLElement | null;
+  private _positionFloatingPicker(selector: string) {
+    const dropdown = this.querySelector(selector) as HTMLElement | null;
     const ta = this._findTextarea();
     if (!dropdown || !ta) return;
     const taRect = ta.getBoundingClientRect();
@@ -345,8 +364,81 @@ export class SessionChat extends LitElement {
     return cmds.map((c, i) => ({ _idx: i, cmd: c }));
   }
 
+  private get _displayFileMentions() {
+    const query = this.fileMentionQuery.toLowerCase();
+    const filtered = query
+      ? this.fileMentionItems.filter(item =>
+          item.path.toLowerCase().includes(query) ||
+          item.name.toLowerCase().includes(query))
+      : this.fileMentionItems;
+    return filtered.slice(0, 60);
+  }
+
+  private _activeMentionToken(value: string, cursor: number): { start: number; query: string } | null {
+    const before = value.slice(0, cursor);
+    const match = before.match(/(^|\s)@([^\s@]*)$/);
+    if (!match) return null;
+    return {
+      start: before.length - match[2].length - 1,
+      query: match[2],
+    };
+  }
+
+  private async loadFileMentionItems() {
+    if (this.fileMentionItems.length > 0 || this.fileMentionLoading) return;
+    this.fileMentionLoading = true;
+    this.requestUpdate();
+    try {
+      const res = await fetch(`/api/file/list?path=${encodeURIComponent(this.sessionCwd)}`);
+      if (res.ok) {
+        const nodes = await res.json();
+        this.fileMentionItems = this.flattenFileNodes(nodes);
+      }
+    } catch {}
+    this.fileMentionLoading = false;
+    this.requestUpdate();
+  }
+
+  private flattenFileNodes(nodes: any[], prefix = ""): FileMentionItem[] {
+    const out: FileMentionItem[] = [];
+    for (const node of nodes || []) {
+      const path = String(node.path || (prefix ? `${prefix}/${node.name}` : node.name));
+      const type = node.type === "directory" ? "directory" : "file";
+      if (Array.isArray(node.children) && node.children.length > 0) {
+        out.push(...this.flattenFileNodes(node.children, path));
+      }
+      if (type === "file") {
+        out.push({ name: String(node.name || path), path, type, size: node.size });
+      }
+    }
+    return out.sort((a, b) => {
+      if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+      return a.path.localeCompare(b.path);
+    });
+  }
+
+  private insertFileMention(item: FileMentionItem, ta: HTMLTextAreaElement | null = this._findTextarea()) {
+    if (!ta) return;
+    const token = this._activeMentionToken(ta.value, ta.selectionStart ?? ta.value.length);
+    if (!token) return;
+    const before = ta.value.slice(0, token.start);
+    const after = ta.value.slice(ta.selectionStart ?? ta.value.length);
+    const inserted = `@${item.path} `;
+    ta.value = before + inserted + after;
+    const nextCursor = (before + inserted).length;
+    ta.selectionStart = nextCursor;
+    ta.selectionEnd = nextCursor;
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    ta.focus();
+    this.showFileMentions = false;
+    this.fileMentionQuery = "";
+    this.fileMentionIdx = 0;
+    this.requestUpdate();
+  }
+
   async initChat() {
     this.agent = new HttpAgent(this.sessionId);
+    this.agent.setCwd(this.sessionCwd);
     this.agent.subscribe((event: any) => {
       if (event.type === "goal_start") {
         this.goalStatus = {
@@ -416,12 +508,28 @@ export class SessionChat extends LitElement {
       const ta = e.target as HTMLTextAreaElement;
       if (ta.tagName !== "TEXTAREA") return;
       const val = ta.value;
-      if (val === "/") {
+      const cursor = ta.selectionStart ?? val.length;
+      const mention = this._activeMentionToken(val, cursor);
+      if (mention) {
+        this.showSlashCommands = false;
         this._slashFilterText = "";
+        this.fileMentionQuery = mention.query;
+        this.showFileMentions = true;
+        this.fileMentionIdx = 0;
+        this.loadFileMentionItems();
+        this.requestUpdate();
+      } else if (this.showFileMentions) {
+        this.showFileMentions = false;
+        this.fileMentionQuery = "";
+        this.requestUpdate();
+      } else if (val === "/") {
+        this._slashFilterText = "";
+        this.showFileMentions = false;
         this.showSlashCommands = true; this.slashIdx = 0;
         this.requestUpdate();
       } else if (val.startsWith("/") && val.length > 1) {
         this._slashFilterText = val;
+        this.showFileMentions = false;
         const filtered = this._displayCommands;
         if (filtered.length === 0) { this.showSlashCommands = false; this.requestUpdate(); return; }
         this.slashIdx = 0;
@@ -434,6 +542,22 @@ export class SessionChat extends LitElement {
     this._slashKeydown = (e: KeyboardEvent) => {
       const ta = e.target as HTMLTextAreaElement;
       if (ta.tagName !== "TEXTAREA") return;
+      if (this.showFileMentions) {
+        const items = this._displayFileMentions;
+        if (e.key === "ArrowDown") { e.preventDefault(); this.fileMentionIdx = (this.fileMentionIdx + 1) % Math.max(1, items.length); this.requestUpdate(); return; }
+        if (e.key === "ArrowUp") { e.preventDefault(); this.fileMentionIdx = (this.fileMentionIdx - 1 + Math.max(1, items.length)) % Math.max(1, items.length); this.requestUpdate(); return; }
+        if ((e.key === "Enter" || e.key === "Tab") && items.length > 0) {
+          e.preventDefault();
+          this.insertFileMention(items[this.fileMentionIdx] || items[0], ta);
+          return;
+        }
+        if (e.key === "Escape") {
+          this.showFileMentions = false;
+          this.fileMentionQuery = "";
+          this.requestUpdate();
+          return;
+        }
+      }
       if (!this.showSlashCommands) {
         // Show menu on "/" keypress (fallback if input event missed)
         if (e.key === "/" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
@@ -442,6 +566,13 @@ export class SessionChat extends LitElement {
             this._slashFilterText = "";
             this.showSlashCommands = true; this.slashIdx = 0; this.requestUpdate();
           }
+        }
+        if (e.key === "@" && !e.ctrlKey && !e.metaKey) {
+          this.showFileMentions = true;
+          this.fileMentionQuery = "";
+          this.fileMentionIdx = 0;
+          this.loadFileMentionItems();
+          this.requestUpdate();
         }
         return;
       }
@@ -463,7 +594,12 @@ export class SessionChat extends LitElement {
       if (res.ok) {
         const sessions = await res.json();
         const s = sessions.find((s: any) => s.id === this.sessionId);
-        if (s?.cwd) { this.sessionCwd = s.cwd; this.terminalCwd = s.cwd; }
+        if (s?.cwd) {
+          this.sessionCwd = s.cwd;
+          this.terminalCwd = s.cwd;
+          this.agent?.setCwd(s.cwd);
+          this.fileMentionItems = [];
+        }
       }
     } catch {}
     this.fetchGitStatus();
@@ -494,6 +630,7 @@ export class SessionChat extends LitElement {
     if (except !== "config") this.showConfig = false;
     if (except !== "addModel") this.showAddModelDialog = false;
     if (except !== "context") this.showContextDetail = false;
+    if (except !== "fileMention") this.showFileMentions = false;
   }
 
   toggleModelDropdown = () => {
@@ -1676,6 +1813,21 @@ export class SessionChat extends LitElement {
                     ${c.action === "ai" ? html`<span class="slash-badge">AI</span>` : ""}
                   </div>`;
               })}
+            </div>
+            <div class="file-mention-dropdown ${this.showFileMentions ? 'active' : ''}">
+              ${this.fileMentionLoading ? html`<div class="file-mention-empty">Loading files...</div>` : ""}
+              ${!this.fileMentionLoading && this._displayFileMentions.length === 0 ? html`<div class="file-mention-empty">No matching files</div>` : ""}
+              ${this._displayFileMentions.map((item, idx) => html`
+                <div class="file-mention-item${idx === this.fileMentionIdx ? ' selected' : ''}" @click=${() => this.insertFileMention(item)}>
+                  <span class="file-mention-icon">${item.type === "directory" ? html`
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                  ` : html`
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  `}</span>
+                  <span class="file-mention-name">${item.name}</span>
+                  <span class="file-mention-path">${item.path}</span>
+                </div>
+              `)}
             </div>
             ${this.chatPanel}
           </div>

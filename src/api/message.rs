@@ -60,11 +60,19 @@ pub async fn send(
         cmd
     };
     agent.send_command(&cmd).await.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let notify_config = state.config.clone();
+    let notify_session_id = id.clone();
+    let notify_prompt = message.clone();
     let stream = async_stream::stream! {
         loop {
             match rx.recv().await {
                 Ok(event) => {
                     let json = serde_json::to_string(&event).unwrap_or_default();
+                    let completion_notice = crate::api::notify::completion_text(
+                        &notify_session_id,
+                        &notify_prompt,
+                        &event,
+                    );
                     let event_type = match &event {
                         crate::pi::protocol::AgentEvent::AgentStart { .. } => "agent_start",
                         crate::pi::protocol::AgentEvent::AgentEnd { .. } => "agent_end",
@@ -91,6 +99,12 @@ pub async fn send(
                     yield Ok(Event::default().event(event_type).data(json));
 
                     if matches!(event, crate::pi::protocol::AgentEvent::AgentEnd { .. }) {
+                        if let Some(message) = completion_notice {
+                            let config = notify_config.clone();
+                            tokio::spawn(async move {
+                                crate::api::notify::send_completion(config, message).await;
+                            });
+                        }
                         break;
                     }
                 }

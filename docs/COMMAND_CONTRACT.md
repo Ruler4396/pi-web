@@ -25,6 +25,14 @@ This document defines the current user-facing slash command contract between `pi
 | `/fork ...` | Forwarded to the model/runtime as prompt text unless the runtime adds a dedicated RPC command. | `prompt` today. | Ends on `agent_end`. |
 | `/btw ...` | Forwarded as a prompt with frontend-only temporary-message intent today. | `prompt`. | Ends on `agent_end`. |
 
+## File Mentions
+
+Typing `@` in the composer opens a current-workspace file picker rooted at the active session `cwd`.
+Selecting a file inserts `@relative/path` into the visible message. Before `pi-web` sends the
+message to `pi_rust`, it expands up to five referenced files into explicit `<file path="...">`
+blocks with a 20,000 character cap per file. The user-visible message remains compact, while the
+runtime receives enough context to act without guessing which file was intended.
+
 ## Goal Loop Invariants
 
 `/goal` must satisfy these invariants before it is considered production-ready:
@@ -35,6 +43,14 @@ This document defines the current user-facing slash command contract between `pi
 - It stops after repeated normalized no-progress assistant responses.
 - It remains abortable through the existing `abort` RPC command.
 - The frontend must surface running, completed, and stopped states instead of treating `/goal` as a normal opaque chat response.
+
+## Completion Notification
+
+When `pi-web` observes `agent_end`, it sends a best-effort completion notification through the
+Hermes MCP bridge by calling the `send_wecom_notification` tool. The default command is
+`python3 /root/dev/hermes-bridge/mcp_server.py`; override it with `PI_WEB_HERMES_NOTIFY_COMMAND`
+and `PI_WEB_HERMES_NOTIFY_ARGS`, or disable it with `PI_WEB_HERMES_NOTIFY=0`.
+Notification failure is logged but must not block or fail the chat stream.
 
 ## CI Boundary
 

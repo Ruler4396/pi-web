@@ -9,6 +9,7 @@ export class HttpAgent {
   private listeners: Set<(event: AgentEvent, signal: AbortSignal) => void | Promise<void>> = new Set();
   private abortController: AbortController | null = null;
   private _aborted = false; private _isBtw = false;
+  private cwd = "/root";
   chatPanel?: any;
 
   constructor(sessionId: string) {
@@ -53,7 +54,10 @@ export class HttpAgent {
       messageText = "";
     }
 
-    this._state.addMessage({ role: "user", content: [{ type: "text", text: messageText }] });
+    const originalMessageText = messageText;
+    const messageForRuntime = await this.expandFileMentions(messageText);
+
+    this._state.addMessage({ role: "user", content: [{ type: "text", text: originalMessageText }] });
     this._state.isStreaming = true;
     this._state.errorMessage = undefined;
 
@@ -63,7 +67,7 @@ export class HttpAgent {
       const res = await fetch(`/api/session/${this.sessionId}/message`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageText, thinkingLevel: this._state.thinkingLevel || "off" }),
+        body: JSON.stringify({ message: messageForRuntime, thinkingLevel: this._state.thinkingLevel || "off" }),
         signal,
       });
 
@@ -319,6 +323,52 @@ export class HttpAgent {
         await this.emit({ type: "agent_end", messages: [...this._state.messages] });
       }
     }
+  }
+
+  setCwd(cwd: string) {
+    if (cwd) this.cwd = cwd;
+  }
+
+  private async expandFileMentions(messageText: string): Promise<string> {
+    const mentions = this.extractFileMentions(messageText);
+    if (mentions.length === 0) return messageText;
+
+    const blocks: string[] = [];
+    for (const relPath of mentions.slice(0, 5)) {
+      const absPath = this.joinPath(this.cwd, relPath);
+      try {
+        const res = await fetch("/api/file/read?path=" + encodeURIComponent(absPath));
+        if (!res.ok) continue;
+        const data = await res.json();
+        const content = String(data.content || "");
+        blocks.push([
+          `<file path="${relPath}">`,
+          content.slice(0, 20000),
+          content.length > 20000 ? "\n[truncated]" : "",
+          "</file>",
+        ].join(""));
+      } catch {}
+    }
+
+    if (blocks.length === 0) return messageText;
+    return `${messageText}\n\nReferenced files:\n${blocks.join("\n\n")}`;
+  }
+
+  private extractFileMentions(messageText: string): string[] {
+    const found: string[] = [];
+    const seen = new Set<string>();
+    for (const match of messageText.matchAll(/(^|\s)@([^\s@]+)/g)) {
+      const relPath = match[2].replace(/^\.?\//, "");
+      if (!relPath || relPath.includes("..") || relPath.includes("://")) continue;
+      if (seen.has(relPath)) continue;
+      seen.add(relPath);
+      found.push(relPath);
+    }
+    return found;
+  }
+
+  private joinPath(base: string, relPath: string): string {
+    return `${base.replace(/\/+$/, "")}/${relPath.replace(/^\/+/, "")}`;
   }
 
   async setModel(provider: string, modelId: string): Promise<void> {
