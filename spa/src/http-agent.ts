@@ -591,6 +591,9 @@ class HttpAgentState implements AgentState {
     running: boolean;
     objective?: string;
     requestedAgents?: number;
+    taskCount?: number;
+    mode?: string;
+    completed?: boolean;
     plan?: any;
   };
   model: Model<any> = { provider: "deepseek", id: "deepseek-chat", label: "DeepSeek Chat" } as any;
