@@ -345,7 +345,7 @@ export class SessionChat extends LitElement {
     const taRect = ta.getBoundingClientRect();
     const editorRect = editor?.getBoundingClientRect();
     const anchorRect = editorRect && editorRect.width > 0 ? editorRect : taRect;
-    const gap = 8;
+    const gap = 10;
     const viewportPadding = 12;
     const width = Math.min(anchorRect.width, 760, window.innerWidth - viewportPadding * 2);
     const availableHeight = Math.max(80, anchorRect.top - viewportPadding - gap);
